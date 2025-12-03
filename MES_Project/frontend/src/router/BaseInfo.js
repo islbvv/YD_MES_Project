@@ -1,7 +1,9 @@
+import BomVue from '@/views/bom.vue';
 export default [
     {
-        path: '/',
-        name: 'dashboard',
-        component: () => import('@/views/Dashboard.vue')
+        path: '/baseinfo/bom',
+        name: 'bom',
+        component: BomVue
     }
 ];
+///baseinfo/bom

@@ -12,7 +12,7 @@ const model = ref([
                 icon: 'pi pi-fw pi-cog',
                 to: '/',
                 items: [
-                    { label: '제품 및 BOM 등록', to: '/uikit/formlayout' },
+                    { label: '제품 및 BOM 등록', to: '/baseinfo/bom' },
                     { label: '라인 정보', to: '' },
                     { label: '공정 흐름도 등록', to: '' }
                 ]
@@ -25,6 +25,14 @@ const model = ref([
                     {
                         label: '주문',
                         to: ''
+                    },
+                    {
+                        label: '출고관리',
+                        to: '/ForwardingManagement'
+                    },
+                    {
+                        label: '출고조회',
+                        to: '/ForwardingCheck'
                     }
                 ]
             },
@@ -34,8 +42,8 @@ const model = ref([
                 to: '',
                 items: [
                     {
-                        label: '주문',
-                        to: ''
+                        label: '작업지시서목록',
+                        to: '/production/productionPlan'
                     }
                 ]
             },
