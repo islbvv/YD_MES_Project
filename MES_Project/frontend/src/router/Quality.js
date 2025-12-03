@@ -2,6 +2,6 @@ export default [
     {
         path: '/',
         name: 'dashboard',
-        component: () => import('@/views/Dashboard.vue')
+        component: () => import('@/views/uikit/FileDoc.vue')
     }
 ];
