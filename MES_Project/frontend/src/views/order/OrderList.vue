@@ -1,28 +1,27 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import * as XLSX from 'xlsx'; // 엑셀 다운로드용
 
-const orderList = ref([]);
+const orderList = ref([]); // 주문 목록
+const clientList = ref([]); // 거래처 목록
+const statList = ref([]); // 상태 목록
+
+const selectedOrders = ref([]); // 체크박스 선택 목록
 
 // 검색조건
 const search = ref({
     ord_code: '',
     ord_name: '',
     client_name: '',
-    ord_amount: '',
+    ord_amount_from: '',
+    ord_amount_to: '',
     ord_date_from: '',
     ord_date_to: '',
     delivery_date_from: '',
     delivery_date_to: '',
     ord_stat_name: ''
 });
-
-// 날짜 포맷팅 함수
-// const formatDate = (row) => {
-//     if (!row.ord_date) return '';
-//     const d = new Date(row.ord_date);
-//     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-// };
 
 // 주문 목록 조회
 const fetchOrderList = async () => {
@@ -31,6 +30,30 @@ const fetchOrderList = async () => {
         const res = await axios.get(`/api/order/list?${query}`);
         if (res.data.code === 'S200') {
             orderList.value = res.data.data;
+        }
+    } catch (err) {
+        console.error(err);
+    }
+};
+
+// 거래처 목록 조회
+const fetchClientList = async () => {
+    try {
+        const res = await axios.get(`/api/order/client/list`);
+        if (res.data.code === 'S200') {
+            clientList.value = res.data.data;
+        }
+    } catch (err) {
+        console.error(err);
+    }
+};
+
+// 상태 목록 조회
+const fetchStatList = async () => {
+    try {
+        const res = await axios.get(`/api/order/stat/list`);
+        if (res.data.code === 'S200') {
+            statList.value = res.data.data;
         }
     } catch (err) {
         console.error(err);
@@ -53,87 +76,122 @@ const resetSearch = () => {
     fetchOrderList();
 };
 
+// 엑셀 다운로드 기능
+const downloadExcel = () => {
+    const data = selectedOrders.value.length > 0 ? selectedOrders.value : orderList.value;
+
+    if (data.length === 0) {
+        alert('다운로드할 데이터가 없습니다.');
+        return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '주문목록');
+
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    XLSX.writeFile(workbook, `주문목록_${date}.xlsx`);
+};
+
 onMounted(() => {
     fetchOrderList();
+    fetchClientList();
+    fetchStatList();
 });
 </script>
 
 <template>
     <div class="order-container">
+        <!-- Header -->
         <div class="header-section">
             <h2 class="page-title">주문 조회</h2>
             <div class="breadcrumb">주문 > 주문 조회</div>
         </div>
 
-        <div class="form-grid">
+        <!-- 검색 조건 -->
+        <div class="content-card">
             <div class="card-header">
-                <h3 class="card-title"><i class="pi pi-pencil mr-2 text-primary"></i>검색 조건</h3>
+                <h3 class="card-title"><i class="pi pi-search mr-2 text-primary"></i>검색 조건</h3>
             </div>
 
-            <div class="field-group">
-                <label class="field-label">주문번호</label>
-                <input v-model="search.ord_code" type="text" class="input" placeholder="주문번호" />
+            <div class="search-grid">
+                <div class="field-group">
+                    <label>주문번호</label>
+                    <input v-model="search.ord_code" type="text" class="input" />
+                </div>
+
+                <div class="field-group">
+                    <label>주문명</label>
+                    <input v-model="search.ord_name" type="text" class="input" />
+                </div>
+
+                <div class="field-group">
+                    <label>주문일자</label>
+                    <div class="range-input">
+                        <input v-model="search.ord_date_from" type="date" class="input" />
+                        <span>~</span>
+                        <input v-model="search.ord_date_to" type="date" class="input" />
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label>거래처</label>
+                    <select v-model="search.client_name" class="input">
+                        <option value=""></option>
+                        <option v-for="c in clientList" :value="c.client_name" :key="c.client_code">
+                            {{ c.client_name }}
+                        </option>
+                    </select>
+                </div>
+
+                <div class="field-group">
+                    <label>수량</label>
+                    <div class="range-input">
+                        <input v-model="search.ord_amount_from" type="number" class="input" />
+                        <span>~</span>
+                        <input v-model="search.ord_amount_to" type="number" class="input" />
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label>납기일</label>
+                    <div class="range-input">
+                        <input v-model="search.delivery_date_from" type="date" class="input" />
+                        <span>~</span>
+                        <input v-model="search.delivery_date_to" type="date" class="input" />
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label>상태</label>
+                    <select v-model="search.ord_stat_name" class="input">
+                        <option value=""></option>
+                        <option v-for="stat in statList" :key="stat.com_value" :value="stat.note">
+                            {{ stat.note }}
+                        </option>
+                    </select>
+                </div>
             </div>
 
-            <div class="field-group">
-                <label class="field-label">주문명</label>
-                <input v-model="search.ord_name" type="text" class="input" placeholder="주문명" />
-            </div>
-
-            <div class="field-group">
-                <label class="field-label">거래처</label>
-                <select v-model="search.client_name" class="client-select" @change="search">
-                    <option value=""></option>
-                    <option value="DE1">요청</option>
-                    <option value="DE2">승인</option>
-                    <option value="DE4">취소</option>
-                </select>
-            </div>
-
-            <div class="field-group">
-                <label class="field-label">수량</label>
-                <input v-model="search.ord_amount" type="number" class="input" placeholder="수량" />
-                ~
-                <input v-model="search.ord_amount" type="number" class="input" placeholder="수량" />
-            </div>
-
-            <div class="field-group">
-                <label class="field-label">주문일자</label>
-                <input v-model="search.ord_date_from" type="date" class="input" />
-                ~
-                <input v-model="search.ord_date_to" type="date" class="input" />
-            </div>
-
-            <div class="field-group">
-                <label class="field-label">납기일</label>
-                <input v-model="search.delivery_date_from" type="date" class="input" />
-                ~
-                <input v-model="search.delivery_date_to" type="date" class="input" />
-            </div>
-
-            <div class="field-group">
-                <label class="field-label">상태</label>
-                <input v-model="search.ord_stat_name" type="text" class="input" placeholder="상태" />
-            </div>
-
-            <div class="form-actions center-actions">
-                <button class="px-4 py-2 bg-gray-400 rounded text-white" @click="resetSearch">초기화</button>
-                <button class="px-4 py-2 bg-blue-500 rounded text-white" @click="fetchOrderList">조회</button>
+            <div class="search-actions">
+                <button class="btn-gray" @click="resetSearch">초기화</button>
+                <button class="btn-blue" @click="fetchOrderList">조회</button>
             </div>
         </div>
 
-        <div class="content-card">
+        <!-- 주문 목록 -->
+        <div class="content-card mt-6">
             <div class="card-header">
                 <h3 class="card-title">
                     <i class="pi pi-list mr-2 text-primary"></i>주문 목록
-                    <span class="ml-2 text-sm font-normal text-gray-500">(총 {{ orderList.length }}건)</span>
+                    <span class="count-text">(검색 결과 {{ orderList.length }}건)</span>
                 </h3>
+
+                <button class="btn-excel" @click="downloadExcel"><i class="pi pi-file-excel mr-2"></i>엑셀 다운로드</button>
             </div>
 
-            <DataTable :value="orderList" showGridlines stripedRows responsiveLayout="scroll" class="text-sm" removableSort>
-                <template #empty>
-                    <div class="text-center p-4 text-gray-500">등록된 주문 목록이 없습니다.</div>
-                </template>
+            <DataTable :value="orderList" v-model:selection="selectedOrders" selectionMode="multiple" dataKey="ord_code" showGridlines stripedRows responsiveLayout="scroll" class="text-sm">
+                <Column selectionMode="multiple" style="width: 3rem"></Column>
 
                 <Column header="No." headerClass="center-header" bodyClass="text-center" style="width: 3rem">
                     <template #body="slotProps">
@@ -141,152 +199,121 @@ onMounted(() => {
                     </template>
                 </Column>
 
-                <Column field="ord_code" header="주문번호" sortable headerClass="center-header" bodyClass="text-center" style="min-width: 100px"></Column>
-                <Column field="ord_name" header="주문명" sortable headerClass="center-header" bodyClass="text-center" style="min-width: 150px"></Column>
-                <Column field="ord_date" header="주문일자" sortable headerClass="center-header" bodyClass="text-center"></Column>
-                <Column field="prod_name" header="제품명" sortable headerClass="center-header" bodyClass="text-center"></Column>
-                <Column field="ord_amount" header="수량" sortable headerClass="center-header" bodyClass="text-center"></Column>
-                <Column field="client_name" header="거래처" sortable headerClass="center-header" bodyClass="text-center"></Column>
-                <Column field="delivery_date" header="납기일" sortable headerClass="center-header" bodyClass="text-center"></Column>
-                <Column field="ord_stat_name" header="상태" sortable headerClass="center-header" bodyClass="text-center"></Column>
-                <Column field="note" header="비고" sortable headerClass="center-header" bodyClass="text-center"></Column>
+                <Column field="ord_code" header="주문번호" sortable class="center-header text-center" />
+                <Column field="ord_name" header="주문명" sortable class="center-header text-center" />
+                <Column field="ord_date" header="주문일자" sortable class="center-header text-center" />
+                <Column field="prod_name" header="제품명" sortable class="center-header text-center" />
+                <Column field="ord_amount" header="수량" sortable class="center-header text-center" />
+                <Column field="client_name" header="거래처" sortable class="center-header text-center" />
+                <Column field="delivery_date" header="납기일" sortable class="center-header text-center" />
+                <Column field="ord_stat_name" header="상태" sortable class="center-header text-center" />
+                <Column field="note" header="비고" sortable class="center-header text-center" />
+
+                <template #empty>
+                    <div class="text-center p-4 text-gray-500">등록된 주문이 없습니다.</div>
+                </template>
             </DataTable>
         </div>
     </div>
 </template>
 
 <style scoped>
-/* 기본 레이아웃 스타일 */
 .order-container {
-    max-width: 1200px;
+    max-width: 1300px;
     margin: 0 auto;
     padding: 2rem;
-    font-family: 'Pretendard', 'Inter', sans-serif;
-    background-color: #f8f9fa;
-    min-height: 100vh;
-}
-
-.header-section {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
+    background: #f4f6f8;
 }
 
 .page-title {
-    font-size: 1.75rem;
+    font-size: 1.8rem;
     font-weight: 800;
-    color: #111827;
-    margin: 0;
-}
-
-.breadcrumb {
-    color: #6b7280;
-    font-size: 0.9rem;
 }
 
 .content-card {
     background: white;
     border-radius: 12px;
-    box-shadow:
-        0 4px 6px -1px rgba(0, 0, 0, 0.05),
-        0 2px 4px -1px rgba(0, 0, 0, 0.03);
     padding: 1.5rem;
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
 }
 
 .card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid #e5e7eb;
 }
 
-.card-title {
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: #374151;
-    margin: 0;
+.search-grid {
+    display: grid;
+    gap: 1.2rem;
+    margin-top: 1rem;
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.field-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4b5563;
+    margin-bottom: 0.4rem;
+}
+
+.input {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+}
+
+.range-input {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.search-actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-top: 1.6rem;
+}
+
+.btn-gray {
+    background: #9ca3af;
+    color: white;
+    padding: 0.5rem 1.2rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.btn-blue {
+    background: #2563eb;
+    color: white;
+    padding: 0.5rem 1.4rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.btn-excel {
+    background: #16a34a;
+    color: white;
+    padding: 0.45rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
     display: flex;
     align-items: center;
 }
 
-.form-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-}
-
-@media (min-width: 1024px) {
-    .form-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-    .col-span-full {
-        grid-column: 1 / -1;
-    }
-}
-
-@media (min-width: 768px) and (max-width: 1023px) {
-    .form-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-.field-group {
-    display: flex;
-    flex-direction: column;
-}
-
-.field-label {
+.count-text {
     font-size: 0.9rem;
-    font-weight: 600;
-    color: #4b5563;
-    margin-bottom: 0.5rem;
+    color: #6b7280;
 }
 
-.required {
-    color: #ef4444;
-}
-
-:deep(.bg-gray-50) {
-    background-color: #f9fafb;
-}
-
-/* PrimeVue Input 100% 채우기 */
-:deep(.p-inputtext),
-:deep(.p-calendar),
-:deep(.p-inputnumber) {
-    width: 100%;
-}
-
-.form-actions {
-    display: flex;
-    margin-top: 1.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid #f3f4f6;
-}
-
-.final-actions {
-    display: flex;
-    margin-top: 2rem;
-}
-
-.center-actions {
+.center-header .p-column-header-content {
     justify-content: center;
-}
-
-.mr-2 {
-    margin-right: 0.5rem;
-}
-.text-primary {
-    color: var(--primary-color);
-}
-
-/* 테이블 내용 중앙 정렬 */
-:deep(.text-center) {
-    text-align: center !important;
 }
 </style>
 
