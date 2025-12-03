@@ -14,7 +14,7 @@ const model = ref([
                 items: [
                     { label: '제품 및 BOM 등록', to: '/uikit/formlayout' },
                     { label: '라인 정보', to: '' },
-                    { label: '공정 흐름도 등록', to: '' }
+                    { label: '공정 흐름도 등록', to: '/process' }
                 ]
             },
             {
