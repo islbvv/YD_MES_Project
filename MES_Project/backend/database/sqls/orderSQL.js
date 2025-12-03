@@ -34,4 +34,10 @@ module.exports = {
   /* 상태 */
   AND ( ? IS NULL OR ? = '' OR o.ord_stat LIKE CONCAT('%', ?, '%') )
 `,
+
+  // 거래처 목록 전체 조회
+  selectClientList: `
+  SELECT client_name
+  FROM client_tbl
+  `,
 };

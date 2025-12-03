@@ -44,3 +44,18 @@ exports.getOrderList = async (filters) => {
     throw err;
   }
 };
+
+// 거래처 목록 전체 조회
+exports.getClientList = async () => {
+  try {
+    const rows = await query("selectClientList");
+
+    return rows;
+  } catch (err) {
+    console.error(
+      "[orderService.js || 거래처 목록 전체 조회 실패]",
+      err.message
+    );
+    throw err;
+  }
+};
