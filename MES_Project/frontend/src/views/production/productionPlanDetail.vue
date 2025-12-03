@@ -1,13 +1,13 @@
 <script setup>
 import { ref, computed } from 'vue';
 // 1. 분리된 컴포넌트 임포트 (경로는 실제 파일 구조에 맞게 수정 필요)
-import SearchForm from '../../components/production/SearchForm.vue';
-import SearchTable from '../../components/production/SearchTable.vue';
+// import SearchForm from '../../components/production/SearchForm.vue';
+import NonStandardProcess from '../../components/production/NonStandardProcess.vue';
 
-// 로직에서 searchForm을 제거하고, 검색 조건을 관리할 ref만 남김
+// 검색 조건을 관리할 ref만 남김
 const searchCriteria = ref({});
 
-// 📌 1. 작업지시 관련 필드로 데이터 구조 수정
+// 📌 1. 작업지시 관련 필드로 데이터 구조 수정 (유지)
 const allRows = ref([
     {
         id: 1,
@@ -50,54 +50,52 @@ const allRows = ref([
     }
 ]);
 
-// 2. 검색 이벤트 핸들러: 검색 조건을 받아와 필터링 로직 실행
+// 2. 검색 이벤트 핸들러 (유지)
 const handleSearch = (form) => {
     console.log('🔍 검색 요청 수신:', form);
-    searchCriteria.value = form; // 새로운 검색 조건 저장
-
-    // 실제로는 이 곳에서 API 호출을 수행하고, 결과를 allRows에 업데이트해야 합니다.
+    searchCriteria.value = form;
+    // 실제로는 이 곳에서 API 호출을 수행해야 합니다.
 };
 
-// 3. 초기화 이벤트 핸들러
+// 3. 초기화 이벤트 핸들러 (유지)
 const handleReset = () => {
     console.log('🔄 초기화 요청 수신');
-    searchCriteria.value = {}; // 검색 조건 초기화
-    // allRows.value = fetchAllData(); // 전체 데이터 재로딩 (필요하다면)
+    searchCriteria.value = {};
 };
 
 const downloadExcel = () => {
     console.log('엑셀 다운로드 클릭, 현재 검색 조건:', searchCriteria.value);
 };
 
-// 📌 4. 필터링 로직 수정 (새로운 필드명 반영)
+// 📌 4. 필터링 로직 정리
+// 더미 데이터(allRows)에 없는 필드(manager) 및 불필요한 주석을 정리했습니다.
 const filteredRows = computed(() => {
     const sForm = searchCriteria.value;
-    if (Object.keys(sForm).length === 0 || Object.values(sForm).every((v) => v === '' || v === null)) {
-        return allRows.value; // 검색 조건이 없으면 전체 반환
+
+    // 검색 조건이 없거나 모두 빈 값이면 전체 반환
+    const hasSearchCriteria = Object.keys(sForm).some((key) => sForm[key] !== '' && sForm[key] !== null && sForm[key] !== undefined);
+    if (!hasSearchCriteria) {
+        return allRows.value;
     }
 
     return allRows.value.filter((r) => {
-        // 작업지시번호 (기존 releaseNo)
+        // 작업지시번호
         if (sForm.workOrderNo && !r.workOrderNo.toLowerCase().includes(sForm.workOrderNo.toLowerCase())) return false;
+
         // 제품명
         if (sForm.productName && !r.productName.toLowerCase().includes(sForm.productName.toLowerCase())) return false;
 
-        // 공정명 (새로운 필터링 항목)
+        // 공정명
         if (sForm.processName && !r.processName.toLowerCase().includes(sForm.processName.toLowerCase())) return false;
 
-        // 작업일자 범위 (기존 date)
+        // 작업일자 범위
         if (sForm.dateFrom && r.workDate < sForm.dateFrom) return false;
         if (sForm.dateTo && r.workDate > sForm.dateTo) return false;
 
-        // 상태 (새로운 필터링 항목 - 예시)
+        // 상태
         if (sForm.status && r.status !== sForm.status) return false;
 
-        // 담당자/거래처 필터링은 제거하거나 새로운 필드명 (예: manager)으로 대체 필요
-        // 현재 더미 데이터에는 manager가 남아있어 임시로 manager 필터링을 유지합니다.
-        if (sForm.manager && !r.manager.toLowerCase().includes(sForm.manager.toLowerCase())) return false;
-
-        // 나머지 필터링 로직 (qty, client 등)은 데이터에서 제거되었으므로,
-        // searchCriteria에서 관련 항목을 정리해야 합니다.
+        // ⭐ 정리된 코드: 더미 데이터에 없는 'manager', 'qty', 'client' 관련 필터링 로직은 제거되었습니다.
 
         return true;
     });
@@ -106,9 +104,9 @@ const filteredRows = computed(() => {
 
 <template>
     <div class="forward-check-page">
-        <SearchForm @search="handleSearch" @reset="handleReset" />
+        <!-- <SearchForm @search="handleSearch" @reset="handleReset" /> -->
 
-        <SearchTable :rows="filteredRows" @download="downloadExcel" />
+        <NonStandardProcess :rows="filteredRows" @download="downloadExcel" />
     </div>
 </template>
 
