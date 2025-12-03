@@ -7,121 +7,58 @@ const selectedProducts = ref();
 // DataTable에 표시할 데이터 (ref로 감싸 반응형으로 만듭니다)
 const tableData = ref([
     {
-        itemCode: 'ITEM-001',
-        itemName: '제품 A',
-        standard: 'SPEC-A',
-        unit: 'EA'
+        inspection_item: '중량',
+        range_top: '105',
+        range_bot: '95',
+        unit: 'g'
     },
     {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
-    },
-    {
-        itemCode: 'ITEM-002',
-        itemName: '제품 B',
-        standard: 'SPEC-B',
-        unit: 'BOX'
+        inspection_item: '길이',
+        range_top: '105',
+        range_bot: '100',
+        unit: 'cm'
     }
 ]);
 
 // DataTable의 컬럼 정의
 const columns = [
-    { field: 'itemCode', header: '검사항목' }, //, readOnly: true = itemCode를 읽기 전용으로 설정
-    { field: 'itemName', header: '기준값(상한)' },
-    { field: 'standard', header: '기준값(하한)' },
-    { field: 'unit', header: '단위' }
+    { field: 'inspection_item', header: '검사항목', readOnly: true }, //, readOnly: true = itemCode를 읽기 전용으로 설정
+    { field: 'range_top', header: '기준값(상한)' },
+    { field: 'range_bot', header: '기준값(하한)' },
+    { field: 'unit', header: '단위', readOnly: true }
 ];
 
 // 셀 편집 완료 시 호출될 함수
 const onCellEditComplete = (event) => {
     let { data, newValue, field } = event;
     data[field] = newValue;
+};
+
+// '+' 버튼 클릭 시 빈 데이터 행 추가
+const addRow = () => {
+    tableData.value.push({
+        inspection_item: '',
+        range_top: '',
+        range_bot: '',
+        unit: ''
+    });
+};
+
+// '-' 버튼 클릭 시 선택된 데이터 행 제거
+const removeSelectedRows = () => {
+    // 선택된 항목이 없으면 함수 종료
+    if (!selectedProducts.value || selectedProducts.value.length === 0) {
+        return;
+    }
+
+    // 제거할 항목들의 inspection_item 값을 Set으로 만들어 효율적인 검색을 돕니다.
+    const itemsToRemove = new Set(selectedProducts.value.map((p) => p.inspection_item));
+
+    // tableData 배열에서 제거할 항목들을 제외한 새 배열을 만듭니다.
+    tableData.value = tableData.value.filter((item) => !itemsToRemove.has(item.inspection_item));
+
+    // 선택된 항목 배열을 비웁니다.
+    selectedProducts.value = [];
 };
 
 // 통화 형식으로 변환하는 함수
@@ -131,109 +68,104 @@ const formatCurrency = (value) => {
 </script>
 
 <template>
-    <!-- 기본 정보 -->
-    <div>
-        <div class="card flex flex-col gap-2">
-            <div class="flex justify-between items-center">
-                <div class="font-semibold text-xl">기본정보</div>
-                <div class="flex gap-2">
-                    <Button label="삭제" :fluid="false"></Button>
-                    <Button label="초기화" :fluid="false"></Button>
-                    <Button label="저장" :fluid="false"></Button>
-                    <Button label="검사지시 불러오기" :fluid="false"></Button>
-                </div>
-            </div>
-
-            <!-- 모든 기본정보 항목을 담는 단일 Grid 컨테이너 -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- 검사지시코드 -->
-                <div class="grid grid-cols-12 gap-2">
-                    <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">검사지시코드</label>
-                    <div class="col-span-12 md:col-span-8">
-                        <InputText id="instructionCode" type="text" class="w-full" :readonly="1" />
-                    </div>
-                </div>
-
-                <!-- 지시일자 -->
-                <div class="grid grid-cols-12 gap-2">
-                    <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">지시일자</label>
-                    <div class="col-span-12 md:col-span-8">
-                        <InputText id="instructionDate" type="text" class="w-full" />
-                    </div>
-                </div>
-
-                <!-- 지시자 -->
-                <div class="grid grid-cols-12 gap-2">
-                    <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">지시자</label>
-                    <div class="col-span-12 md:col-span-8">
-                        <InputText id="instructor" type="text" class="w-full" />
-                    </div>
-                </div>
-
-                <!-- 여기에 새 항목을 추가하면 자동으로 다음 칸으로 들어갑니다. -->
+    <div class="card flex flex-col gap-2">
+        <div class="flex justify-between items-center">
+            <div class="font-semibold text-xl">기본정보</div>
+            <div class="flex gap-2">
+                <Button label="삭제" :fluid="false"></Button>
+                <Button label="초기화" :fluid="false"></Button>
+                <Button label="저장" :fluid="false"></Button>
+                <Button label="검사지시 불러오기" :fluid="false"></Button>
             </div>
         </div>
-    </div>
-    <!-- 기본 정보 -->
-    <div>
-        <div class="card flex flex-col gap-2">
-            <div class="flex justify-between items-center">
-                <div class="font-semibold text-xl">기본정보</div>
-                <div class="flex gap-2">
-                    <Button label="재고목록 불러오기" :fluid="false"></Button>
-                    <Button label="생산실적 불러오기" :fluid="false"></Button>
+
+        <!-- 모든 기본정보 항목을 담는 단일 Grid 컨테이너 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- 검사지시코드 -->
+            <div class="grid grid-cols-12 gap-2">
+                <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">검사지시코드</label>
+                <div class="col-span-12 md:col-span-8">
+                    <InputText id="instructionCode" type="text" class="w-full" :readonly="1" />
                 </div>
             </div>
 
-            <!-- 모든 기본정보 항목을 담는 단일 Grid 컨테이너 -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- 검사대상 -->
-                <div class="grid grid-cols-12 gap-2">
-                    <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">검사대상</label>
-                    <div class="col-span-12 md:col-span-8">
-                        <InputText id="instructionCode" type="text" class="w-full" />
-                    </div>
+            <!-- 지시일자 -->
+            <div class="grid grid-cols-12 gap-2">
+                <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">지시일자</label>
+                <div class="col-span-12 md:col-span-8">
+                    <InputText id="instructionDate" type="text" class="w-full" />
                 </div>
+            </div>
 
-                <!-- 품목코드 -->
-                <div class="grid grid-cols-12 gap-2">
-                    <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">품목코드</label>
-                    <div class="col-span-12 md:col-span-8">
-                        <InputText id="instructionDate" type="text" class="w-full" />
-                    </div>
+            <!-- 지시자 -->
+            <div class="grid grid-cols-12 gap-2">
+                <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">지시자</label>
+                <div class="col-span-12 md:col-span-8">
+                    <InputText id="instructor" type="text" class="w-full" />
                 </div>
+            </div>
 
-                <!-- 품목이름 -->
-                <div class="grid grid-cols-12 gap-2">
-                    <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">품목이름</label>
-                    <div class="col-span-12 md:col-span-8">
-                        <InputText id="instructor" type="text" class="w-full" />
-                    </div>
+            <!-- 여기에 새 항목을 추가하면 자동으로 다음 칸으로 들어갑니다. -->
+        </div>
+
+        <div class="flex justify-between items-center">
+            <div class="font-semibold text-xl">기본정보</div>
+            <div class="flex gap-2">
+                <Button label="재고목록 불러오기" :fluid="false"></Button>
+                <Button label="생산실적 불러오기" :fluid="false"></Button>
+            </div>
+        </div>
+
+        <!-- 모든 기본정보 항목을 담는 단일 Grid 컨테이너 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- 검사대상 -->
+            <div class="grid grid-cols-12 gap-2">
+                <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">검사대상</label>
+                <div class="col-span-12 md:col-span-8">
+                    <InputText id="instructionCode" type="text" class="w-full" />
                 </div>
+            </div>
 
-                <!-- 검사수량 -->
-                <div class="grid grid-cols-12 gap-2">
-                    <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">검사수량</label>
-                    <div class="col-span-12 md:col-span-8">
-                        <InputText id="instructor" type="text" class="w-full" />
-                    </div>
+            <!-- 품목코드 -->
+            <div class="grid grid-cols-12 gap-2">
+                <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">품목코드</label>
+                <div class="col-span-12 md:col-span-8">
+                    <InputText id="instructionDate" type="text" class="w-full" />
+                </div>
+            </div>
+
+            <!-- 품목이름 -->
+            <div class="grid grid-cols-12 gap-2">
+                <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">품목이름</label>
+                <div class="col-span-12 md:col-span-8">
+                    <InputText id="instructor" type="text" class="w-full" />
+                </div>
+            </div>
+
+            <!-- 검사수량 -->
+            <div class="grid grid-cols-12 gap-2">
+                <label for="instructionCode" class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">검사수량</label>
+                <div class="col-span-12 md:col-span-8">
+                    <InputText id="instructor" type="text" class="w-full" />
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- 데이터테이블 -->
-    <div class="card flex flex-col gap-2 flex-grow" style="max-height: 30vh">
         <div class="flex justify-between items-center flex-shrink-0">
             <div class="font-semibold text-xl">검사항목</div>
+            <div class="flex gap-2">
+                <Button label="+" @click="addRow" :fluid="false"></Button>
+                <Button label="-" @click="removeSelectedRows" :fluid="false"></Button>
+            </div>
         </div>
 
         <DataTable
             class="w-full flex-grow min-h-0"
+            style="max-height: 30vh"
             v-model:selection="selectedProducts"
             :value="tableData"
             editMode="cell"
-            dataKey="itemCode"
+            dataKey="inspection_item"
             :scrollable="true"
             scrollHeight="flex"
             @cell-edit-complete="onCellEditComplete"
