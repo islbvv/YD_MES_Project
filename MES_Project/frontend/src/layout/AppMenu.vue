@@ -56,8 +56,16 @@ const model = ref([
                 to: '',
                 items: [
                     {
-                        label: '주문',
+                        label: '자재 재고',
                         to: ''
+                    },
+                    {
+                        label: '발주서 관리',
+                        to: '/po'
+                    },
+                    {
+                        label: '발주서 목록',
+                        to: '/poList'
                     }
                 ]
             }

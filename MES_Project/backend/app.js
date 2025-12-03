@@ -24,6 +24,8 @@ app.use((err, req, res, next) => {
 
 // 각 모듈별 라우터 불러오기
 const sampleRouter = require("./routers/sampleRouter.js");
+const poRouter = require("./routers/poRouter.js");
 
 // 라우터 연결
 app.use(`/api/productions`, sampleRouter);
+app.use(`/poder`, poRouter);
