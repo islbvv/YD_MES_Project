@@ -48,8 +48,8 @@ const model = ref([
                     {
                         label: '작업 진행',
                         to: '/Production/work'
-                    }
-                  ,{
+                    },
+                    {
                         label: '작업지시서목록',
                         to: '/production/productionPlan'
                     }
@@ -91,17 +91,17 @@ const model = ref([
                         label: '발주서 목록',
                         to: '/poList'
                     },
-                  {
+                    {
                         label: '입고등록',
                         to: { name: 'InboundRegistration' }
                     },
                     {
                         label: '입출고내역',
-                        to: 'InOutHistory'
+                        to: { name: 'InOutHistory' }
                     },
                     {
                         label: '재고목록',
-                        to: 'StockList'
+                        to: { name: 'StockList' }
                     }
                 ]
             }
