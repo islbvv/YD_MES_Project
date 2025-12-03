@@ -1,3 +1,4 @@
+import BomVue from '@/views/bom.vue';
 export default [
     {
         path: '/madeinfo/process',
@@ -8,5 +9,10 @@ export default [
         path: '/example',
         name: 'example',
         component: () => import('@/views/sam.vue')
+    },{
+        path: '/baseinfo/bom',
+        name: 'bom',
+        component: BomVue
     }
 ];
+///baseinfo/bom
