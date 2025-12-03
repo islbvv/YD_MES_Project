@@ -13,5 +13,16 @@ export default [
         path: '/ForwardingCheck',
         name: 'ForwardingCheck',
         component: () => import('@/views/release/ForwardingCheck.vue')
+        component: () => import('@/views/Dashboard.vue')
+    },
+    {
+        path: '/order/list',
+        name: 'OrderList',
+        component: () => import('@/views/order/OrderList.vue')
+    },
+    {
+        path: '/order/management',
+        name: 'OrderManagement',
+        component: () => import('@/views/order/OrderManagement.vue')
     }
 ];
