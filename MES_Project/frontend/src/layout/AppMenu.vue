@@ -25,6 +25,14 @@ const model = ref([
                     {
                         label: '주문',
                         to: ''
+                    },
+                    {
+                        label: '출고관리',
+                        to: '/ForwardingManagement'
+                    },
+                    {
+                        label: '출고조회',
+                        to: '/ForwardingCheck'
                     }
                 ]
             },
