@@ -2,28 +2,30 @@ module.exports = {
   // 단일 발주서 헤더 조회
   selectPoHeaderByCode: `
     SELECT
-      purchase_code,
-      stat,
-      regdate,
-      note,
-      mcode
-    FROM mpo_tbl
-    WHERE purchase_code = ?
-  `,
+    purchase_code,
+    purchase_req_date,
+    stat,
+    regdate,
+    note,
+    mcode
+  FROM mpo_tbl
+  WHERE purchase_code = ?
+`,
 
   // 해당 발주서의 자재 상세 목록 조회
   selectPoDetailsByCode: `
-    SELECT
-      mpo_d_code,
-      unit,
-      req_qtt,
-      deadline,
-      purchase_code,
-      client_code
-    FROM mpo_d_tbl
-    WHERE purchase_code = ?
-    ORDER BY mpo_d_code
-  `,
+ SELECT
+    mpo_d_code,
+    mat_code,
+    unit,
+    req_qtt,
+    deadline,
+    purchase_code,
+    client_code
+  FROM mpo_d_tbl
+  WHERE purchase_code = ?
+  ORDER BY mpo_d_code
+`,
 
   // 발주 헤더 INSERT
   insertPoHeader: `
@@ -65,4 +67,21 @@ module.exports = {
     mat_code
   ) VALUES (?, ?, ?, ?, ?, ?,?)
 `,
+  // 발주서 목록 조회
+  selectPoList: `
+    SELECT
+      t.purchase_code      AS purchaseCode,
+      DATE(t.purchase_req_date) AS purchaseDate,
+      MIN(d.mat_code)      AS matCode
+    FROM mpo_tbl t
+    LEFT JOIN mpo_d_tbl d
+      ON t.purchase_code = d.purchase_code
+    WHERE 
+      (? IS NULL OR t.purchase_code LIKE CONCAT('%', ?, '%'))
+    GROUP BY
+      t.purchase_code,
+      t.purchase_req_date
+    ORDER BY
+      t.purchase_code DESC
+  `,
 };

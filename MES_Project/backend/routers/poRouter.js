@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const poService = require("../services/poService.js");
 
-// 발주 단건 조회 (발주정보 불러오기 버튼에서 사용)
+// 발주 단건 조회
 router.get("/:purchaseCode", async (req, res, next) => {
   try {
     const { purchaseCode } = req.params;
@@ -24,11 +24,25 @@ router.get("/:purchaseCode", async (req, res, next) => {
   }
 });
 
-// 발주 저장 (신규/수정)
+// 발주서 목록 조회
+router.get("/", async (req, res, next) => {
+  try {
+    const { purchaseCode } = req.query;
+    const list = await poService.getPoList(purchaseCode);
+
+    res.json({
+      code: "S200",
+      data: list,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+//  발주 저장 (신규/수정 공통)
 router.post("/", async (req, res, next) => {
   try {
-    const poDto = req.body; // { header: {...}, items: [...] }
-
+    const poDto = req.body;
     const result = await poService.savePo(poDto);
 
     res.json({

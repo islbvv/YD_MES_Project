@@ -108,7 +108,29 @@ async function savePo(poDto) {
   }
 }
 
+// 발주서 목록 조회
+async function getPoList(purchaseCode) {
+  let conn;
+  try {
+    conn = await getConnection();
+
+    const keyword =
+      purchaseCode && String(purchaseCode).trim()
+        ? String(purchaseCode).trim()
+        : null;
+
+    const rows = await conn.query(sqlList.selectPoList, [keyword, keyword]);
+    return rows;
+  } catch (err) {
+    console.error("getPoList error:", err);
+    throw err;
+  } finally {
+    if (conn) conn.release();
+  }
+}
+
 module.exports = {
   getPoByCode,
   savePo,
+  getPoList,
 };

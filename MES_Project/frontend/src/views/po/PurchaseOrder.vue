@@ -1,6 +1,39 @@
 <script setup>
 import { ref } from 'vue';
 import axios from 'axios';
+import SearchSelectModal from '@/components/common/SearchSelectModal.vue';
+
+const purchaseCode = ref('');
+const showPOModal = ref(false);
+
+// 테이블 헤더 정의 (발주 기본정보)
+const orderColumns = [
+    { field: 'purchaseCode', label: '발주서 번호' },
+    { field: 'purchaseDate', label: '발주제안일' },
+    { field: 'matCode', label: '자재명' }
+];
+
+const orderRows = ref([]);
+
+const fetchOrderList = async (keyword = '') => {
+    const res = await axios.get('/api/poder', {
+        params: {
+            purchaseCode: keyword || null
+        }
+    });
+
+    const rows = res.data.data || [];
+
+    orderRows.value = rows.map((row) => ({
+        ...row,
+        purchaseDate: row.purchaseDate ? String(row.purchaseDate).slice(0, 10) : ''
+    }));
+};
+
+const openOrderModal = async () => {
+    await fetchOrderList();
+    showPOModal.value = true;
+};
 
 function getToday() {
     return new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
@@ -91,6 +124,65 @@ const savePo = async () => {
         alert('저장 중 오류가 발생했습니다.\n콘솔 로그를 확인해 주세요.');
     }
 };
+
+const handleConfirmOrder = async (selectedRow) => {
+    // 선택 안 하고 확인 눌렀을 때 방어
+    if (!selectedRow || !selectedRow.purchaseCode) {
+        alert('발주서를 선택해 주세요.');
+        return;
+    }
+
+    try {
+        // 1) 단건 발주 조회 호출
+        const res = await axios.get(`/api/poder/${selectedRow.purchaseCode}`);
+        const data = res.data.data;
+
+        // 2) 헤더 세팅 (날짜는 YYYY-MM-DD만 사용)
+        purchaseCode.value = data.header.purchase_code;
+        purchaseDate.value = data.header.purchase_req_date ? String(data.header.purchase_req_date).slice(0, 10) : getToday();
+
+        orderDate.value = data.header.regdate ? String(data.header.regdate).slice(0, 10) : getToday();
+
+        status.value = data.header.stat || '요청완료';
+        note.value = data.header.note || '';
+        writerCode.value = data.header.mcode || 'EMP-10003';
+
+        // 3) 상세(자재 목록) 매핑
+        const items = data.items || [];
+
+        console.log('상세 아이템 목록:', items);
+
+        if (items.length) {
+            materials.value = items.map((item) => ({
+                id: item.mpo_d_code, // 고유키로 사용
+                checked: false,
+                name: '', // 아직 컬럼 없으니 빈 값
+                type: '', // 추후 자재구분 생기면 매핑
+                code: item.mat_code || '', // SELECT에 mat_code 추가했을 때
+                unit: item.unit || '',
+                needQty: item.req_qtt || '',
+                stock: '', // 현재고는 다른 테이블/로직에서
+                lackQty: '',
+                dueDate: item.deadline ? String(item.deadline).slice(0, 10) : '',
+                vendor: item.client_code || ''
+            }));
+        } else {
+            // 상세가 0건이면 빈 행 1~3개 만들어서 보여주기
+            materials.value = [createRow(), createRow(), createRow()];
+        }
+
+        allChecked.value = false;
+    } catch (err) {
+        console.error(err);
+        alert('발주 정보를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+        showPOModal.value = false;
+    }
+};
+
+const handleCancelOrder = () => {
+    showPOModal.value = false;
+};
 </script>
 
 <template>
@@ -104,14 +196,14 @@ const savePo = async () => {
                     <button class="btn-red">삭제</button>
                     <button class="btn-black">초기화</button>
                     <button class="btn-blue" @click="savePo()">저장</button>
-                    <button class="btn-green">발주정보 불러오기</button>
+                    <button class="btn-green" @click="openOrderModal">발주정보 불러오기</button>
                 </div>
             </div>
 
             <div class="form-grid">
                 <div class="form-item">
                     <label>발주서번호</label>
-                    <input type="text" class="input" disabled />
+                    <input type="text" class="input" v-model="purchaseCode" disabled />
                 </div>
 
                 <div class="form-item">
@@ -208,6 +300,7 @@ const savePo = async () => {
             </table>
         </div>
     </section>
+    <SearchSelectModal v-model="showPOModal" :columns="orderColumns" :rows="orderRows" row-key="purchaseCode" search-placeholder="발주서번호를 입력해주세요." @confirm="handleConfirmOrder" @cancel="handleCancelOrder" />
 </template>
 
 <style scoped>
