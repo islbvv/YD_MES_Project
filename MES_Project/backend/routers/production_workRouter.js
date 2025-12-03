@@ -3,21 +3,11 @@ const router = express.Router();
 const production_workServices = require("../services/production_workServices.js");
 
 // GET /api/productions - 생산 계획 전체 목록 조회
-router.get("/", async (req, res, next) => {
+router.get("/work/list", async (req, res, next) => {
   try {
-    const plans = await production_workServices.getProductionPlans();
+    console.log("생산 현황 체크 불러오는중");
+    const plans = await production_workServices.production_work();
     res.json({ code: "S200", data: plans });
-  } catch (err) {
-    next(err); // 에러를 전역 오류 처리 미들웨어로 전달
-  }
-});
-
-// POST /api/productions/:planId/mrp - 특정 생산 계획으로 MRP 계산
-router.post("/:planId/mrp", async (req, res, next) => {
-  try {
-    const { planId } = req.params;
-    const result = await sampleService.calculateMRP(planId);
-    res.json({ code: "S200", data: result });
   } catch (err) {
     next(err); // 에러를 전역 오류 처리 미들웨어로 전달
   }

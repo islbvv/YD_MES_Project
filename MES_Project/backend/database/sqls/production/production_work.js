@@ -1,7 +1,12 @@
-const work = `
-SELECT 
+//backend/database/production/production_work.js
+module.exports = {
+  // 공통 코드 note 가져오기
+  work: `
+  SELECT 
+    pd.prdr_d_code,
     po.po_name AS 공정명,
     COALESCE(pd.proc_rate, 0) AS 진행률,
+    eq.eq_code AS 설비코드,
     eq.eq_name AS 설비,
     pd.start_date AS 시작일시,
     pd.end_date AS 종료일시,
@@ -19,4 +24,5 @@ WHERE
     pd.prdr_code = 'PRDR-001'
 ORDER BY 
     ppd.no, pd.start_date;
-`;
+`,
+};
