@@ -1,42 +1,66 @@
 <script setup>
 import { ref } from 'vue';
 import axios from 'axios';
+import SearchSelectModal from '@/components/common/SearchSelectModal.vue';
 
-const orderDate = ref(getToday());
+const purchaseCode = ref('');
+const showPOModal = ref(false);
 
-const writerCode = ref('A관리자');
+// 테이블 헤더 정의 (발주 기본정보)
+const orderColumns = [
+    { field: 'purchaseCode', label: '발주서 번호' },
+    { field: 'purchaseDate', label: '발주제안일' },
+    { field: 'matCode', label: '자재명' }
+];
+
+const orderRows = ref([]);
+
+const fetchOrderList = async (keyword = '') => {
+    const res = await axios.get('/api/poder', {
+        params: {
+            purchaseCode: keyword || null
+        }
+    });
+
+    const rows = res.data.data || [];
+
+    orderRows.value = rows.map((row) => ({
+        ...row,
+        purchaseDate: row.purchaseDate ? String(row.purchaseDate).slice(0, 10) : ''
+    }));
+};
+
+const openOrderModal = async () => {
+    await fetchOrderList();
+    showPOModal.value = true;
+};
+
+function getToday() {
+    return new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
+}
+
+// 날짜
+const orderDate = ref(getToday()); // regdate
+const purchaseDate = ref(getToday()); // purchase_req_date
+
+// 헤더 필드
+const writerCode = ref('EMP-10003');
 const note = ref('');
 const status = ref('요청완료');
 
+// 자재 리스트
 const materials = ref([createRow(), createRow(), createRow()]);
 
-const savePo = async () => {
-    const header = {
-        purchase_code: null, // 발주서번호 (수정일 때만 세팅)
-        stat: status.value,
-        regdate: orderDate.value, // 위에서 v-model 한 orderDate
-        note: note.value, // 비고 인풋 v-model
-        mcode: writerCode.value // 작성자 (코드/이름 중 너 설계에 맞게)
-    };
+const allChecked = ref(false);
 
-    const items = materials.value.map((row) => ({
-        unit: row.unit,
-        needQty: row.needQty,
-        dueDate: row.dueDate,
-        vendor: row.vendor // 공급업체 코드 or 이름
-    }));
-
-    const res = await axios.post('/api/poder', { header, items });
-    console.log(res.data);
-};
-
+// 자재 행 생성
 function createRow() {
     return {
         id: Date.now() + Math.random(), // 고유 ID
         checked: false,
         name: '',
         type: '',
-        code: '',
+        code: '', // mat_code
         unit: '',
         needQty: '',
         stock: '',
@@ -45,10 +69,6 @@ function createRow() {
         dueDate: '',
         vendor: ''
     };
-}
-
-function getToday() {
-    return new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
 }
 
 function addRow() {
@@ -60,8 +80,6 @@ function deleteSelected() {
     allChecked.value = false;
 }
 
-const allChecked = ref(false);
-
 function toggleAll() {
     materials.value.forEach((r) => {
         r.checked = allChecked.value;
@@ -72,6 +90,99 @@ function loadRequest() {
     // 추후 연동할 때 구현
     console.log('구매요청서 불러오기');
 }
+
+const savePo = async () => {
+    const today = getToday();
+
+    const header = {
+        purchase_code: null, // 신규 등록
+        purchase_req_date: purchaseDate.value || today, // 발주제안일
+        stat: status.value,
+        regdate: orderDate.value || today, // 시스템 등록일
+        note: note.value,
+        mcode: writerCode.value
+    };
+
+    const items = materials.value
+        .map((row) => ({
+            unit: row.unit,
+            needQty: row.needQty,
+            dueDate: row.dueDate,
+            vendor: row.vendor,
+            code: row.code
+        }))
+        .filter((item) => {
+            return item.unit || item.needQty || item.dueDate || item.vendor || item.code;
+        });
+
+    try {
+        const res = await axios.post('/api/poder', { header, items });
+        console.log(res.data);
+        alert('발주 정보가 저장되었습니다.');
+    } catch (err) {
+        console.error(err);
+        alert('저장 중 오류가 발생했습니다.\n콘솔 로그를 확인해 주세요.');
+    }
+};
+
+const handleConfirmOrder = async (selectedRow) => {
+    // 선택 안 하고 확인 눌렀을 때 방어
+    if (!selectedRow || !selectedRow.purchaseCode) {
+        alert('발주서를 선택해 주세요.');
+        return;
+    }
+
+    try {
+        // 1) 단건 발주 조회 호출
+        const res = await axios.get(`/api/poder/${selectedRow.purchaseCode}`);
+        const data = res.data.data;
+
+        // 2) 헤더 세팅 (날짜는 YYYY-MM-DD만 사용)
+        purchaseCode.value = data.header.purchase_code;
+        purchaseDate.value = data.header.purchase_req_date ? String(data.header.purchase_req_date).slice(0, 10) : getToday();
+
+        orderDate.value = data.header.regdate ? String(data.header.regdate).slice(0, 10) : getToday();
+
+        status.value = data.header.stat || '요청완료';
+        note.value = data.header.note || '';
+        writerCode.value = data.header.mcode || 'EMP-10003';
+
+        // 3) 상세(자재 목록) 매핑
+        const items = data.items || [];
+
+        console.log('상세 아이템 목록:', items);
+
+        if (items.length) {
+            materials.value = items.map((item) => ({
+                id: item.mpo_d_code, // 고유키로 사용
+                checked: false,
+                name: '', // 아직 컬럼 없으니 빈 값
+                type: '', // 추후 자재구분 생기면 매핑
+                code: item.mat_code || '', // SELECT에 mat_code 추가했을 때
+                unit: item.unit || '',
+                needQty: item.req_qtt || '',
+                stock: '', // 현재고는 다른 테이블/로직에서
+                lackQty: '',
+                dueDate: item.deadline ? String(item.deadline).slice(0, 10) : '',
+                vendor: item.client_code || ''
+            }));
+        } else {
+            // 상세가 0건이면 빈 행 1~3개 만들어서 보여주기
+            materials.value = [createRow(), createRow(), createRow()];
+        }
+
+        allChecked.value = false;
+    } catch (err) {
+        console.error(err);
+        alert('발주 정보를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+        showPOModal.value = false;
+    }
+};
+
+const handleCancelOrder = () => {
+    showPOModal.value = false;
+};
 </script>
 
 <template>
@@ -85,27 +196,27 @@ function loadRequest() {
                     <button class="btn-red">삭제</button>
                     <button class="btn-black">초기화</button>
                     <button class="btn-blue" @click="savePo()">저장</button>
-                    <button class="btn-green">발주정보 불러오기</button>
+                    <button class="btn-green" @click="openOrderModal">발주정보 불러오기</button>
                 </div>
             </div>
 
             <div class="form-grid">
                 <div class="form-item">
                     <label>발주서번호</label>
-                    <input type="text" class="input" disabled />
+                    <input type="text" class="input" v-model="purchaseCode" disabled />
                 </div>
 
                 <div class="form-item">
                     <label>발주제안일</label>
-                    <input type="date" class="input" v-model="orderDate" disabled />
+                    <input type="date" class="input" v-model="purchaseDate" />
                 </div>
 
                 <div class="form-item">
                     <label>작성자</label>
                     <select class="input" v-model="writerCode">
-                        <option>A관리자</option>
-                        <option>B관리자</option>
-                        <option>C관리자</option>
+                        <option>EMP-10003</option>
+                        <option>EMP-10004</option>
+                        <option>EMP-10001</option>
                     </select>
                 </div>
 
@@ -162,7 +273,13 @@ function loadRequest() {
 
                         <td><input class="cell-input" v-model="row.name" /></td>
                         <td><input class="cell-input" v-model="row.type" /></td>
-                        <td><input class="cell-input" v-model="row.code" /></td>
+                        <td>
+                            <select class="cell-input" v-model="row.code">
+                                <option>MAT-1001</option>
+                                <option>MAT-1002</option>
+                                <option>MAT-1003</option>
+                            </select>
+                        </td>
 
                         <td>
                             <select class="cell-input" v-model="row.unit">
@@ -183,6 +300,7 @@ function loadRequest() {
             </table>
         </div>
     </section>
+    <SearchSelectModal v-model="showPOModal" :columns="orderColumns" :rows="orderRows" row-key="purchaseCode" search-placeholder="발주서번호를 입력해주세요." @confirm="handleConfirmOrder" @cancel="handleCancelOrder" />
 </template>
 
 <style scoped>
