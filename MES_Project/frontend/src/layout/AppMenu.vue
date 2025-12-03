@@ -25,6 +25,14 @@ const model = ref([
                     {
                         label: '주문',
                         to: ''
+                    },
+                    {
+                        label: '출고관리',
+                        to: '/ForwardingManagement'
+                    },
+                    {
+                        label: '출고조회',
+                        to: '/ForwardingCheck'
                     }
                 ]
             },
@@ -34,8 +42,8 @@ const model = ref([
                 to: '',
                 items: [
                     {
-                        label: '주문',
-                        to: ''
+                        label: '작업지시서목록',
+                        to: '/production/productionPlan'
                     }
                 ]
             },
