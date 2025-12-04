@@ -354,4 +354,9 @@ const cancelRegistration = () => {
 .center-header .p-datatable-column-header-content {
     justify-content: center !important;
 }
+html,
+body {
+    height: 100%;
+    overflow: hidden;
+}
 </style>
