@@ -46,16 +46,24 @@ const model = ref([
                 to: '',
                 items: [
                     {
-                        label: '주문',
-                        to: '/uikit/table'
+                        label: '작업지시서목록',
+                        to: '/Production/productionPlan'
+                    },
+                    {
+                        label: '작업지시서관리',
+                        to: '/Production/productionPlanDetail'
                     },
                     {
                         label: '작업 진행',
-                        to: '/Production/work'
+                        to: '/Production/productionwork'
                     },
                     {
-                        label: '작업지시서목록',
-                        to: '/production/productionPlan'
+                        label: '작업 진행 목록',
+                        to: '/Production/TaskProgressList'
+                    },
+                    {
+                        label: '생산 실적',
+                        to: '/Production/WorkPerformance'
                     }
                 ]
             },
@@ -75,6 +83,14 @@ const model = ref([
                     {
                         label: '품질검사 지시관리',
                         to: '/quality/instructions-management'
+                    },
+                    {
+                        label: '품질검사결과 목록',
+                        to: '/qc/list'
+                    },
+                    {
+                        label: '품질검사결과 관리',
+                        to: '/qc/manage'
                     }
                 ]
             },
