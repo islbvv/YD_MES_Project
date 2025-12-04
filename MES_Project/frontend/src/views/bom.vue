@@ -1,7 +1,10 @@
 <script setup>
 import { ref } from 'vue';
+import BomProductModal from './BomProductModal.vue';
+import axios from 'axios';
+// import BomProductModal from '@/views/BomProductModal.vue';
 // PrimeVue 컴포넌트는 전역 등록되어 있다고 가정 (Sakai 템플릿 기본 구조)
-
+const isModalVisible = ref(false);
 const searchForm = ref({
     itemCode: '',
     itemName: '',
@@ -9,52 +12,38 @@ const searchForm = ref({
     endDate: null,
     useYn: null // null = 전체
 });
+const typeMap = {
+    i1: '완제품',
+    i2: '반제품',
+    i3: '부자재',
+    i4: '원자재'
+};
+const useYnMap = {
+    f2: '사용중',
+    f1: '미사용'
+};
 
+const openProductModal = () => {
+    isModalVisible.value = true;
+};
+const onProductSelect = (selectedProduct) => {
+    (searchForm.value.itemCode = selectedProduct.prod_code), (searchForm.value.itemName = selectedProduct.prod_name);
+};
 const useYnOptions = [
-    { label: '전체', value: null },
     { label: '사용', value: 'Y' },
     { label: '미사용', value: 'N' }
 ];
 
 const itemTypeOptions = [
-    { label: '완제품', value: 'FG' },
-    { label: '반제품', value: 'SG' },
-    { label: '원자재', value: 'RM' },
-    { label: '부자재', value: 'SUB' }
+    { label: '완제품', value: 'i1' },
+    { label: '반제품', value: 'i2' },
+    { label: '부자재', value: 'i3' },
+    { label: '원자재', value: 'i4' }
 ];
-
 // -------------------------------
 // Mock 데이터 (API 연동 시 교체)
 // -------------------------------
-const bomList = ref([
-    {
-        id: 1,
-        itemCode: 'WH001',
-        itemName: '신라면',
-        shelfLife: '90일',
-        status: '활성',
-        regDate: '2025-05-05',
-        useYn: 'Y'
-    },
-    {
-        id: 2,
-        itemCode: 'WH002',
-        itemName: '안성탕면',
-        shelfLife: '90일',
-        status: '활성',
-        regDate: '2025-05-25',
-        useYn: 'Y'
-    },
-    {
-        id: 3,
-        itemCode: 'WH005',
-        itemName: '꼬꼬면',
-        shelfLife: '180일',
-        status: '비활성',
-        regDate: '2025-05-10',
-        useYn: 'N'
-    }
-]);
+const bomList = ref([]);
 
 const selectedBom = ref(null);
 
@@ -115,27 +104,43 @@ const onResetSearch = () => {
     };
 };
 
-const onSearch = () => {
-    // TODO: 검색 API 연동
-    console.log('검색 조건', searchForm.value);
+const onSearch = async () => {
+    const payload = {
+        itemCode: searchForm.value.itemCode,
+        itemName: searchForm.value.itemName,
+        startDate: searchForm.value.startDate,
+        endDate: searchForm.value.endDate,
+        useYn: searchForm.value.useYn
+    };
+
+    const res = await axios.post('/api/baseinfo/bom/search', payload);
+    bomList.value = res.data;
 };
 
-const onSelectBom = (e) => {
+const onSelectBom = async (e) => {
     const row = e.data;
     selectedBom.value = row;
 
     // TODO: 선택한 품목 기준으로 상세/하위자재 조회 API 연동
     detailForm.value = {
-        id: row.id,
-        bomCode: row.itemCode,
-        itemName: row.itemName,
-        itemType: 'FG',
-        spec: '',
-        useYn: row.useYn,
-        shelfLife: 180,
-        regDate: new Date(row.regDate),
-        remark: ''
+        bomCode: row.prod_code,
+        itemName: row.prod_name,
+        itemType: row.com_value?.trim() || null,
+        spec: row.spec,
+        useYn: row.is_used,
+        shelfLife: row.edate ? new Date(row.edate) : null,
+        regDate: row.regdate,
+        remark: row.note
     };
+    const res = await axios.get(`/api/baseinfo/bom/mat/${row.prod_code}`);
+    subMaterialList.value = res.data.map((m) => ({
+        materialCode: m.mat_code,
+        materialName: m.mat_name,
+        materialType: m.mat_type,
+        qty: m.req_qtt,
+        unit: m.unit,
+        lossRate: m.loss_rate
+    }));
 };
 
 const onDeleteBom = () => {
@@ -190,48 +195,59 @@ const onUpdate = () => {
     console.log('수정', detailForm.value, subMaterialList.value);
 };
 </script>
-<!-- src/views/mes/BomManageView.vue -->
+
 <template>
     <div class="p-fluid bom-page">
-        <!-- 상단 헤더(화면ID, 화면명 등)는 공통 레이아웃에서 처리한다고 보고 생략 -->
-        <!-- 검색 영역 -->
         <div class="card search-panel">
             <div class="search-row">
                 <div class="field">
                     <label for="itemCode">품목코드</label>
-                    <InputText id="itemCode" v-model="searchForm.itemCode" placeholder="품목코드 입력" />
+                    <InputText id="itemCode" v-model="searchForm.itemCode" placeholder="품목코드 입력" @click="openProductModal" readonly />
                 </div>
 
                 <div class="field">
                     <label for="itemName">품목명</label>
-                    <InputText id="itemName" v-model="searchForm.itemName" placeholder="품목명 입력" />
+                    <InputText id="itemName" v-model="searchForm.itemName" placeholder="품목명 입력" @click="openProductModal" readonly />
                 </div>
 
                 <div class="field date-range-field flex flex-column">
                     <label class="mb-1">등록일자</label>
 
                     <div class="align-items-center gap-2">
-                        <Calendar v-model="searchForm.startDate" dateFormat="yy-mm-dd" :showIcon="true" style="width: 80px" />
-                        <span>~</span>
-                        <Calendar v-model="searchForm.endDate" dateFormat="yy-mm-dd" :showIcon="true" style="width: 80px" />
+                        <Calendar v-model="searchForm.startDate" dateFormat="yy-mm-dd" :showIcon="true" style="width: 200px" />
+                        <span> ~ </span>
+                        <Calendar v-model="searchForm.endDate" dateFormat="yy-mm-dd" :showIcon="true" style="width: 200px" />
                     </div>
                 </div>
 
                 <div class="field">
                     <label for="useYn">사용여부</label>
-                    <Dropdown id="useYn" v-model="searchForm.useYn" :options="useYnOptions" optionLabel="label" optionValue="value" placeholder="전체" />
+
+                    <div class="useyn-radio">
+                        <div class="flex align-items-center gap-3">
+                            <div class="flex align-items-center gap-1">
+                                <RadioButton inputId="useYnYes" name="useYn" value="f2" v-model="searchForm.useYn" />
+                                <label for="useYnYes" class="radio-label">사용</label>
+                            </div>
+
+                            <div class="flex align-items-center gap-1">
+                                <RadioButton inputId="useYnNo" name="useYn" value="f1" v-model="searchForm.useYn" />
+                                <label for="useYnNo" class="radio-label">미사용</label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="field button-group">
-                <Button label="초기화" class="p-button-secondary" @click="onResetSearch" />
-                <Button label="조회" class="p-button-warning" @click="onSearch" />
+
+            <div class="button-group">
+                <Button label="초기화" class="p-button-secondary large-search-btn" @click="onResetSearch" />
+                <Button label="조회" class="p-button-warning large-search-btn" @click="onSearch" />
             </div>
         </div>
-        <div class="card bom-card">
-            <div class="content-layout">
-                <!-- 좌측: 품목 목록 + 하위자재 영역 -->
-                <div class="left-pane">
-                    <!-- 검색 결과 헤더 -->
+
+        <div class="content-layout">
+            <div class="left-container">
+                <div class="card item-list-card">
                     <div class="list-header">
                         <div>검색 결과 {{ bomList.length }}건</div>
                         <div class="list-header-buttons">
@@ -240,23 +256,23 @@ const onUpdate = () => {
                         </div>
                     </div>
 
-                    <!-- 품목 목록 그리드 -->
-                    <DataTable :value="bomList" dataKey="id" v-model:selection="selectedBom" selectionMode="single" @rowSelect="onSelectBom" scrollable scrollHeight="220px" class="p-datatable-sm bom-list-table">
+                    <DataTable :value="bomList" dataKey="prod_code" v-model:selection="selectedBom" selectionMode="single" @rowSelect="onSelectBom" scrollable scrollHeight="flex" class="p-datatable-sm bom-list-table">
                         <Column selectionMode="single" headerStyle="width:3rem"></Column>
-                        <Column field="itemCode" header="품목코드" style="width: 120px"></Column>
-                        <Column field="itemName" header="품목명"></Column>
-                        <Column field="shelfLife" header="유통기한" style="width: 90px"></Column>
-                        <Column field="status" header="상태" style="width: 80px">
+                        <Column field="prod_code" header="품목코드" style="width: 120px"></Column>
+                        <Column field="prod_name" header="품목명"></Column>
+                        <Column field="edate" header="유통기한" style="width: 90px"></Column>
+                        <Column field="is_used" header="사용여부" style="width: 80px">
                             <template #body="{ data }">
-                                <span :class="['status-tag', data.status === '활성' ? 'status-active' : 'status-inactive']">
-                                    {{ data.status }}
+                                <span :class="['status-tag', data.is_used === 'f2' ? 'status-active' : 'status-inactive']">
+                                    {{ data.is_used === 'f2' ? '사용' : '미사용' }}
                                 </span>
                             </template>
                         </Column>
-                        <Column field="regDate" header="등록일자" style="width: 120px"></Column>
+                        <Column field="regdate" header="등록일자" style="width: 120px"></Column>
                     </DataTable>
+                </div>
 
-                    <!-- 하위 자재 구성 영역 -->
+                <div class="card sub-material-card">
                     <div class="sub-material-header">
                         <span>하위 자재 구성 영역</span>
                         <div class="sub-material-buttons">
@@ -265,7 +281,7 @@ const onUpdate = () => {
                         </div>
                     </div>
 
-                    <DataTable :value="subMaterialList" dataKey="id" v-model:selection="selectedSubMaterials" selectionMode="multiple" class="p-datatable-sm sub-material-table">
+                    <DataTable :value="subMaterialList" dataKey="mat_code" v-model:selection="selectedSubMaterials" selectionMode="multiple" scrollable scrollHeight="flex" class="p-datatable-sm sub-material-table">
                         <Column selectionMode="multiple" headerStyle="width:3rem"></Column>
                         <Column field="materialCode" header="자재코드" style="width: 120px"></Column>
                         <Column field="materialName" header="자재명"></Column>
@@ -274,11 +290,10 @@ const onUpdate = () => {
                         <Column field="unit" header="단위" style="width: 70px"></Column>
                         <Column field="lossRate" header="로스율" style="width: 90px"></Column>
                     </DataTable>
-
-                    <div class="hint-text">제품유형을 먼저 선택하고 품목명을 선택하는게 합리적일듯?</div>
                 </div>
+            </div>
 
-                <!-- 우측: 상세/등록/수정 영역 -->
+            <div class="card right-pane-card">
                 <div class="right-pane">
                     <div class="right-header">
                         <div class="flex-gap"></div>
@@ -302,30 +317,33 @@ const onUpdate = () => {
 
                             <div class="field">
                                 <label>품목유형</label>
-                                <Dropdown v-model="detailForm.itemType" :options="itemTypeOptions" optionLabel="label" optionValue="value" placeholder="선택" />
-                            </div>
-
-                            <div class="field">
-                                <label>규격</label>
-                                <InputText v-model="detailForm.spec" placeholder="부자재 빼고, 반제품, 원자재 무게(g)" />
+                                <InputText readonly="true" v-model="typeMap[detailForm.itemType]" :options="itemTypeOptions" optionLabel="label" optionValue="value" placeholder="선택" />
                             </div>
 
                             <div class="field">
                                 <label>사용여부</label>
-                                <Dropdown v-model="detailForm.useYn" :options="useYnOptions" optionLabel="label" optionValue="value" placeholder="선택" />
+                                <inputText
+                                    readonly="true"
+                                    v-model="useYnMap[detailForm.useYn]"
+                                    :options="useYnOptions"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    placeholder="선택"
+                                    :class="useYnMap[detailForm.useYn] === '사용중' ? 'use-yes' : 'use-no'"
+                                />
                             </div>
 
                             <div class="field">
                                 <label>유통기한</label>
                                 <div class="p-inputgroup">
-                                    <InputNumber v-model="detailForm.shelfLife" :min="0" inputId="shelfLife" />
-                                    <span class="p-inputgroup-addon">일</span>
+                                    <Calendar v-model="detailForm.shelfLife" :min="0" inputId="shelfLife" />
+                                    <span class="p-inputgroup-addon"></span>
                                 </div>
                             </div>
 
                             <div class="field">
                                 <label>등록일자</label>
-                                <Calendar v-model="detailForm.regDate" dateFormat="yy-mm-dd" :showIcon="true" :disabled="true" placeholder="regdate 부터 180일" />
+                                <Calendar v-model="detailForm.regDate" dateFormat="yy-mm-dd" :showIcon="true" :disabled="false" placeholder="" />
                             </div>
 
                             <div class="field full-width">
@@ -334,82 +352,139 @@ const onUpdate = () => {
                             </div>
                         </div>
                     </div>
-
-                    <div class="warning-text">제품추가가 안해도 됨</div>
                 </div>
             </div>
         </div>
     </div>
+    <BomProductModal v-model:visible="isModalVisible" @select="onProductSelect" />
 </template>
 
 <style scoped>
 .bom-page {
     padding: 1rem;
-}
-
-.bom-card {
-    padding: 1.5rem;
+    /* 뷰포트 높이 기준으로 설정하여 위아래 스크롤 최소화 */
+    min-height: calc(100vh - 50px);
+    display: flex;
+    flex-direction: column;
 }
 
 /* 검색 영역 */
 .search-panel {
     margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
 }
 
 .search-row {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+    grid-template-columns: repeat(4, 2fr);
     gap: 1rem;
-    align-items: end;
+    align-items: center;
+    width: 100%;
+    font-weight: bolder;
+    white-space: nowrap; /* 줄바꿈 방지 */
+}
+.useyn-radio .radio-label {
+    font-size: 1.2rem;
+    cursor: pointer;
+    user-select: none;
 }
 .search-row .field {
     display: flex;
     flex-direction: column;
-    justify-content: flex-end; /* 내용을 아래쪽으로 밀어서 다른 인풋과 하단 맞춤 */
+    justify-content: flex-end;
 }
 
+/* 버튼 그룹 스타일 */
 .button-group {
     display: flex;
     gap: 0.5rem;
-    margin-top: 20px;
-    justify-content: end;
+    margin-top: 1rem;
+    justify-content: center;
 }
 
-/* 메인 레이아웃 */
+/* 버튼 너비를 넓게 설정 */
+.large-search-btn {
+    width: 150px;
+    max-width: 200px;
+}
+
+/* 메인 레이아웃 (좌측 컨테이너 vs 우측 카드) */
 .content-layout {
     display: grid;
-    grid-template-columns: 2.1fr 1.7fr;
+    grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
+    flex-grow: 1;
+    align-items: stretch; /* 좌우 카드 높이 1:1 일치 */
+}
+.use-yes {
+    background-color: #e6f7e9; /* 옅은 초록 */
+    color: #1e8449; /* 진한 초록 글자 */
+    font-weight: bold;
 }
 
-/* 좌측 영역 */
-.left-pane {
+.use-no {
+    background-color: #fdecea; /* 옅은 빨강 */
+    color: #c0392b; /* 진한 빨강 글자 */
+    font-weight: bold;
+}
+/* 🎯 추가: 좌측 상/하 분할 컨테이너 */
+.left-container {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 1.5rem; /* 카드 사이 간격 */
+    flex-grow: 1;
 }
 
-.list-header {
+/* 🎯 추가: 좌측 상단 카드 (품목 목록) */
+.item-list-card {
+    padding: 1.5rem;
+    /* 높이를 50% 비율로 설정 */
+    flex-grow: 5;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
 }
 
-.list-header-buttons {
+/* 🎯 추가: 좌측 하단 카드 (하위 자재) */
+.sub-material-card {
+    padding: 1.5rem;
+    /* 높이를 50% 비율로 설정 */
+    flex-grow: 5;
     display: flex;
-    gap: 0.5rem;
+    flex-direction: column;
 }
 
+/* 우측 카드 (상세 정보) */
+.right-pane-card {
+    padding: 1.5rem;
+    height: 100%; /* content-layout 높이 꽉 채우기 */
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- 좌측 영역 내부 스타일 --- */
+.list-header,
 .sub-material-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-weight: bolder;
+    margin-bottom: 0.75rem; /* 헤더 아래 공간 확보 */
+}
+
+.sub-material-header {
     margin-top: 0.5rem;
 }
 
+.list-header-buttons,
 .sub-material-buttons {
     display: flex;
     gap: 0.5rem;
+}
+
+/* DataTable이 남은 공간을 채우도록 flex-grow 설정 (PrimeVue scrollHeight="flex" 사용 전제) */
+.p-datatable {
+    flex-grow: 1;
 }
 
 .hint-text {
@@ -418,11 +493,12 @@ const onUpdate = () => {
     color: #777;
 }
 
-/* 우측 영역 */
+/* --- 우측 영역 내부 스타일 --- */
 .right-pane {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    flex-grow: 1;
 }
 
 .right-header {
@@ -441,6 +517,7 @@ const onUpdate = () => {
     border-radius: 4px;
     padding: 1rem;
     background: var(--surface-card);
+    flex-grow: 1; /* 남은 공간을 상세 폼이 채우도록 설정 */
 }
 .detail-form .field {
     display: flex;
@@ -448,12 +525,13 @@ const onUpdate = () => {
 }
 .detail-form .field label {
     margin-bottom: 0.25rem;
-    white-space: nowrap; /* ⚠️ 등록일자 라벨 줄 바꿈 방지 (핵심 해결) */
+    white-space: nowrap;
 }
 .form-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem 1.5rem;
+    font-weight: bolder;
 }
 
 .form-grid .full-width {
