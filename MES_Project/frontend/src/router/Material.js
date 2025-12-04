@@ -1,5 +1,20 @@
 export default [
     {
+        path: '/purchaseReq',
+        name: 'purchaseRequest',
+        component: () => import('@/views/po/PurchaseReq.vue')
+    },
+    {
+        path: '/purchaseReqList',
+        name: 'purchaseRequestList',
+        component: () => import('@/views/po/PurchaseReqList.vue')
+    },
+    {
+        path: '/purchaseReqDetail',
+        name: 'purchaseRequestDetail',
+        component: () => import('@/views/po/PurchaseReqDetail.vue')
+    },
+    {
         path: '/po',
         name: 'purchaseOrder',
         component: () => import('@/views/po/PurchaseOrder.vue')
