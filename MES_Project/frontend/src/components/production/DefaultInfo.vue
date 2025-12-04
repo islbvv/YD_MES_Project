@@ -9,15 +9,18 @@ const props = defineProps({
     }
 });
 
-// 📌 formData 초기 상태
+// 선택된 3가지 값
 const formData = ref({
-    productionPlanNo: '', // prdp_code
-    workOrderNo: '', // wko_code
-    planDate: '', // prdp_date
+    productionPlanNo: '',
+    workOrderNo: '',
+    planDate: '',
     dueDate: '',
     planName: '',
     status: ''
 });
+
+// 나머지 값 잠시 저장
+const otherDataStore = ref(null);
 
 // 모달 상태
 const showPlanModal = ref(false);
@@ -26,11 +29,12 @@ const showPlanModal = ref(false);
 const handleDelete = () => console.log('삭제');
 const handleReset = () => {
     Object.keys(formData.value).forEach((key) => (formData.value[key] = ''));
+    otherDataStore.value = null;
 };
-const handleSave = () => console.log('저장', formData.value);
+const handleSave = () => console.log('저장', formData.value, otherDataStore.value);
 const handleLoadPlan = () => (showPlanModal.value = true);
 
-// 📌 날짜만 표시하는 computed
+// 날짜만 표시
 const formattedPlanDate = computed(() => {
     if (!formData.value.planDate) return '';
     const date = new Date(formData.value.planDate);
@@ -40,17 +44,22 @@ const formattedPlanDate = computed(() => {
     return `${yyyy}-${mm}-${dd}`;
 });
 
-// PlanModal에서 선택된 데이터 처리
-const handlePlanSelected = (d) => {
-    if (d) {
-        console.log('📌 선택된 계획:', d);
-        formData.value.productionPlanNo = d.prdp_code;
-        formData.value.workOrderNo = d.wko_code;
-        formData.value.planDate = d.prdp_date; // 원본은 그대로 저장
-        formData.value.dueDate = d.due_date || '';
-        formData.value.planName = d.prdp_name || '';
-        formData.value.status = d.stat || '';
-    }
+// PlanModal 선택 처리
+const handlePlanSelected = (payload) => {
+    if (!payload) return;
+
+    // 3가지 선택값
+    const selectedData = payload.selectedData;
+    formData.value.productionPlanNo = selectedData.prdp_code;
+    formData.value.workOrderNo = selectedData.wko_code;
+    formData.value.planDate = selectedData.prdp_date;
+
+    // 나머지 값 잠시 저장
+    otherDataStore.value = payload.otherData;
+
+    // 화면에는 표시하지 않고 필요시 emit로 최상위 부모 전달 가능
+    console.log('잠시 저장한 otherData:', otherDataStore.value);
+
     showPlanModal.value = false;
 };
 </script>
@@ -87,12 +96,9 @@ const handlePlanSelected = (d) => {
             <div class="grid-row border-r">
                 <label class="label-col">계획일자</label>
                 <div class="input-col">
-                    <!-- formattedPlanDate 사용 -->
                     <input type="text" :value="formattedPlanDate" readonly class="input-readonly" />
                 </div>
             </div>
-
-            <div class="grid-row"></div>
         </div>
     </div>
 
@@ -102,9 +108,10 @@ const handlePlanSelected = (d) => {
 
 <style scoped>
 .basic-info-card {
-    background-color: #ffffff;
+    background-color: #fff;
     border-radius: 7px;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
 }
 .btn-action {
     padding: 6px 16px;
@@ -140,11 +147,5 @@ const handlePlanSelected = (d) => {
     padding: 4px 8px;
     border-radius: 4px;
     background-color: #f9f9f9;
-}
-.basic-info-card {
-    background-color: #ffffff;
-    border-radius: 7px;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px; /* 밑쪽 여백 추가 */
 }
 </style>
