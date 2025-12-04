@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
-import BomProductModal from './BomProductModal.vue';
-import SubMaterialModal from './BomMatModal.vue';
+import BomProductModal from '../BomProductModal.vue';
+import SubMaterialModal from '../BomMatModal.vue';
 import axios from 'axios';
 // import BomProductModal from '@/views/BomProductModal.vue';
 // PrimeVue 컴포넌트는 전역 등록되어 있다고 가정 (Sakai 템플릿 기본 구조)
@@ -15,6 +15,18 @@ const searchForm = ref({
     endDate: null,
     useYn: null // null = 전체
 });
+const addSubMaterials = (items) => {
+    items.forEach((item) => {
+        subMaterialList.value.push({
+            materialCode: item.mat_code,
+            materialName: item.mat_name,
+            materialType: item.prod_type,
+            unit: item.unit,
+            qty: 0,
+            lossRate: 0
+        });
+    });
+};
 const typeMap = {
     i1: '완제품',
     i2: '반제품',
@@ -81,35 +93,7 @@ const bomList = ref([]);
 
 const selectedBom = ref(null);
 
-const subMaterialList = ref([
-    {
-        id: 1,
-        materialCode: 'RM001',
-        materialName: '밀가루',
-        materialType: '원자재',
-        qty: 100,
-        unit: 'g',
-        lossRate: '0.5%'
-    },
-    {
-        id: 2,
-        materialCode: 'RM002',
-        materialName: '스프',
-        materialType: '반제품',
-        qty: 20,
-        unit: 'g',
-        lossRate: '0.0%'
-    },
-    {
-        id: 3,
-        materialCode: 'RM003',
-        materialName: '비닐포장지',
-        materialType: '부자재',
-        qty: 1,
-        unit: 'EA',
-        lossRate: '0.0%'
-    }
-]);
+const subMaterialList = ref([]);
 
 const selectedSubMaterials = ref([]);
 
@@ -400,7 +384,7 @@ const onUpdate = () => {
         </div>
     </div>
     <BomProductModal v-model:visible="isModalVisible" @select="onProductSelect" />
-    <SubMaterialModal v-model:visible="isSubMaterialModal" @select="onSelectSubMaterial" />
+    <SubMaterialModal v-model:visible="isSubMaterialModal" @select="addSubMaterials" />
 </template>
 
 <style scoped>
