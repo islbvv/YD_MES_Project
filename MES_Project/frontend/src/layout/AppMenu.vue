@@ -42,16 +42,16 @@ const model = ref([
                 to: '',
                 items: [
                     {
-                        label: '주문',
-                        to: '/uikit/table'
-                    },
-                    {
                         label: '작업 진행',
                         to: '/Production/work'
-                    }
-                  ,{
+                    },
+                    {
                         label: '작업지시서목록',
-                        to: '/production/productionPlan'
+                        to: '/Production/productionPlan'
+                    },
+                    {
+                        label: '작업지시서관리',
+                        to: '/Production/productionPlanDetail'
                     }
                 ]
             },
@@ -91,7 +91,7 @@ const model = ref([
                         label: '발주서 목록',
                         to: '/poList'
                     },
-                  {
+                    {
                         label: '입고등록',
                         to: { name: 'InboundRegistration' }
                     },
