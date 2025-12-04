@@ -24,5 +24,15 @@ router.get("/work/task", async (req, res, next) => {
     next(err); // 에러를 전역 오류 처리 미들웨어로 전달
   }
 });
-
+// 생산 실적 목록
+router.get("/work/performance", async (req, res, next) => {
+  try {
+    console.log("생산 실적 목록 불러오는중");
+    const plans = await production_workServices.production_performance();
+    console.log(plans);
+    res.json({ code: "S200", data: plans });
+  } catch (err) {
+    next(err); // 에러를 전역 오류 처리 미들웨어로 전달
+  }
+});
 module.exports = router;

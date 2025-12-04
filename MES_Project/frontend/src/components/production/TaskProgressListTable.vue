@@ -1,5 +1,10 @@
 <script setup>
 import { computed, defineProps, defineEmits } from 'vue';
+import { useRouter } from 'vue-router';
+const router = useRouter();
+const goLink = () => {
+    router.push('/Production/productionwork');
+};
 
 const props = defineProps({
     // rows 배열은 이제 다음 필드를 포함해야 합니다:
@@ -77,7 +82,7 @@ const downloadExcel = () => {
                         <td colspan="10" class="empty">검색 결과가 없습니다.</td>
                     </tr>
 
-                    <tr v-for="row in props.rows" :key="row.id">
+                    <tr v-for="row in props.rows" :key="row.id" @click="goLink()">
                         <td>
                             <input v-model="row.checked" type="checkbox" />
                         </td>

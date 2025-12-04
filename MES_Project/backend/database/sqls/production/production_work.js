@@ -36,4 +36,32 @@ ORDER BY
 from
     wko_tbl wk INNER JOIN prod_tbl prod on wk.prod_code = prod.prod_code;
     `,
+  work_performance: `
+SELECT 
+    prdr.prdr_code AS code,
+    prdr.end_date AS cr_date,
+    prod.prod_name AS name,
+    prdr.work_order_code AS order_num,  
+    prdr.production_qtt AS qtt,
+    COALESCE(SUM(prdrd.def_qtt), 0) AS notqtt,  
+    li.line_code AS linecode,
+    co.note AS stat,
+    lo.lot_num as lotnum
+FROM prdr_tbl prdr
+INNER JOIN common_code co ON prdr.stat = co.com_value 
+INNER JOIN prod_tbl prod ON prdr.prod_code = prod.prod_code
+LEFT JOIN prdr_d_tbl prdrd ON prdr.prdr_code = prdrd.prdr_code 
+INNER JOIN line_d_tbl lid ON lid.line_eq_code = prdrd.line_eq_code
+INNER JOIN line_tbl li ON li.line_code = lid.line_code
+inner join lot_tbl lo on lo.prod_code = prdr.prod_code
+GROUP BY 
+    prdr.prdr_code,
+    prdr.end_date,
+    prod.prod_name,
+    prdr.work_order_code,
+    prdr.production_qtt,
+    li.line_code,
+    co.note
+ORDER BY prdr.prdr_code DESC;
+`,
 };

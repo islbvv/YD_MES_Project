@@ -53,8 +53,7 @@ const downloadExcel = () => {
                         <th>양품수량</th>
                         <th>불량수량</th>
                         <th>LOT번호</th>
-                        <th>공정명</th>
-                        <th>생산계획번호</th>
+                        <th>라인번호</th>
                         <th>상태</th>
                     </tr>
                 </thead>
@@ -67,15 +66,15 @@ const downloadExcel = () => {
                         <td>
                             <input v-model="row.checked" type="checkbox" />
                         </td>
-                        <td>{{ row.workOrderNo }}</td>
-                        <td>{{ row.productName }}</td>
-                        <td>{{ row.processName }}</td>
-                        <td>{{ row.processType }}</td>
-                        <td>{{ row.workDate?.replaceAll('-', '.') }}</td>
-                        <td>{{ row.startTime }}</td>
-                        <td>{{ row.status }}</td>
-                        <td>{{ row.plannedCompletion }}</td>
-                        <td>{{ row.priority }}</td>
+                        <td>{{ row.code }}</td>
+                        <td>{{ row.cr_date }}</td>
+                        <td>{{ row.name }}</td>
+                        <td>{{ row.order_num }}</td>
+                        <td>{{ row.qtt }}</td>
+                        <td>{{ row.notqtt }}</td>
+                        <td>{{ row.lotnum }}</td>
+                        <td>{{ row.linecode }}</td>
+                        <td>{{ row.stat }}</td>
                     </tr>
                 </tbody>
             </table>

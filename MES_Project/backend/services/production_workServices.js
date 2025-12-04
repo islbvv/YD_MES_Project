@@ -25,3 +25,15 @@ exports.production_task = async () => {
     conn.release();
   }
 };
+exports.production_performance = async () => {
+  const conn = await getConnection();
+  try {
+    const result = await conn.query(sqlList.work_performance, []);
+    console.log(result);
+    return {
+      result,
+    };
+  } finally {
+    conn.release();
+  }
+};
