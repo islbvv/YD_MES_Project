@@ -1,42 +1,71 @@
 <!-- src/views/release/ForwardingManagement.vue -->
 <script setup>
-import { reactive, ref } from 'vue';
+import { reactive, ref, onMounted } from 'vue';
 import SearchSelectModal from '@/components/common/SearchSelectModal.vue';
+import axios from 'axios';
 
 const showOrderModal = ref(false);
 const showReleaseModal = ref(false); // 출고 모달
+
+// 🔹 등록자(직원) 목록
+const employees = ref([]);
+
+const formatDate = (d) => {
+    if (!d) return '';
+    // Date 객체든 문자열이든 "2025-06-24T..." 형태를 잘라서 날짜만
+    return String(d).split('T')[0];
+};
+
+/* ===========================
+ *  주문 모달 (검색용)
+ * =========================== */
 
 // 🔹 주문 검색 모달 컬럼
 const orderColumns = [
     { field: 'orderNo', label: '주문번호' },
     { field: 'orderDate', label: '주문일자' },
     { field: 'orderName', label: '주문명' },
-    { field: 'client', label: '거래처' },
-    { field: 'dueDate', label: '납기일' },
-    { field: 'priority', label: '우선순위' }
+    { field: 'client', label: '거래처' }
 ];
 
 // 백엔드에서 채워질 주문 리스트
 const orderRows = ref([]);
 const orderKeyword = ref('');
 
+// 주문 목록 조회 API
+const fetchOrderList = async (keyword = '') => {
+    const res = await axios.get('/api/release/fwd/orders', {
+        params: { keyword }
+    });
+
+    console.log('[Forwarding] 주문 목록 응답:', res.data);
+
+    const raw = res.data?.data;
+
+    if (!raw) {
+        orderRows.value = [];
+    } else if (Array.isArray(raw)) {
+        orderRows.value = raw;
+    } else {
+        orderRows.value = [raw];
+    }
+};
+
 // 주문 모달 열기
 const openOrderModal = () => {
+    fetchOrderList(); // 초기 목록
     showOrderModal.value = true;
-    // TODO: 주문 초기 목록 로딩 API 호출 (옵션)
-    // e.g. fetchOrderList('');
 };
 
 // 주문 검색
 const handleSearchOrder = (keyword) => {
     orderKeyword.value = keyword;
-    console.log('[Forwarding] 주문 검색 키워드:', keyword);
-
-    // TODO: 백엔드 연동
-    // api.get('/orders', { params: { keyword } }).then(res => {
-    //   orderRows.value = res.data;
-    // });
+    fetchOrderList(keyword);
 };
+
+/* ===========================
+ *  출고 모달 (검색용)
+ * =========================== */
 
 // 🔹 출고 검색 모달 컬럼 (헤더 중심)
 const releaseColumns = [
@@ -52,22 +81,53 @@ const releaseColumns = [
 const releaseRows = ref([]);
 const releaseKeyword = ref('');
 
+// 출고 목록 조회 API
+const fetchReleaseList = async (keyword = '') => {
+    try {
+        const res = await axios.get('/api/release/fwd', {
+            params: { keyword }
+        });
+
+        console.log('[Forwarding] 출고 목록 조회 응답:', res.data);
+
+        const raw = res.data?.data;
+
+        if (!raw) {
+            releaseRows.value = [];
+        } else if (Array.isArray(raw)) {
+            releaseRows.value = raw.map((r) => ({
+                ...r,
+                releaseDate: formatDate(r.releaseDate)
+            }));
+        } else {
+            releaseRows.value = [
+                {
+                    ...raw,
+                    releaseDate: formatDate(raw.releaseDate)
+                }
+            ];
+        }
+    } catch (err) {
+        console.error('[Forwarding] 출고 목록 조회 실패:', err);
+        releaseRows.value = [];
+    }
+};
+
 // 출고 모달 열기
 const openReleaseModal = () => {
+    fetchReleaseList('');
     showReleaseModal.value = true;
-    // TODO: 출고 초기 목록 로딩 API 호출 (옵션)
 };
 
 // 출고 검색
 const handleSearchRelease = (keyword) => {
     releaseKeyword.value = keyword;
-    console.log('[Forwarding] 출고 검색 키워드:', keyword);
-
-    // TODO: 백엔드 연동
-    // api.get('/releases', { params: { keyword } }).then(res => {
-    //   releaseRows.value = res.data;
-    // });
+    fetchReleaseList(keyword);
 };
+
+/* ===========================
+ *  기본 정보 + 제품 리스트
+ * =========================== */
 
 // 🔹 기본정보
 const basicInfo = reactive({
@@ -76,105 +136,233 @@ const basicInfo = reactive({
     releaseDate: '',
     orderDate: '',
     client: '',
-    registrant: 'EMP-10001',
+    registrant: '',
     remark: ''
 });
 
+// 제품 리스트 (주문/출고 선택 시 API 결과로 채움)
+const products = ref([]);
+
+/**
+ * 주문 상세 조회 API
+ * GET /api/release/fwd/orders/:orderNo
+ * 응답: { status: 'success', data: { header, items } }
+ */
+const fetchOrderDetail = async (orderNo) => {
+    if (!orderNo) return;
+
+    try {
+        const res = await axios.get(`/api/release/fwd/orders/${orderNo}`);
+
+        if (res.data?.status !== 'success' || !res.data.data) {
+            console.warn('[Forwarding] 주문 상세 없음');
+            return;
+        }
+
+        const { header, items } = res.data.data;
+        console.log('[Forwarding] 주문 상세 응답:', header, items);
+
+        // 헤더 정보 채우기 (alias 기준)
+        basicInfo.orderCode = header.orderNo;
+        basicInfo.orderDate = formatDate(header.orderDate);
+        basicInfo.client = header.client;
+
+        // 제품 리스트 세팅
+        products.value = (items || []).map((item) => ({
+            productCode: item.productCode,
+            name: item.productName,
+            type: item.type,
+            spec: item.spec,
+            unit: item.unit,
+            orderQty: item.orderQty,
+            // 처음 출고수량은 0으로
+            releaseQty: 0,
+            stockQty: item.stockQty ?? item.currentStock ?? 0,
+            dueDate: item.dueDate ? formatDate(item.dueDate) : '',
+            notReleasedQty: item.notReleasedQty ?? null
+        }));
+    } catch (err) {
+        console.error('[Forwarding] 주문 상세 조회 실패:', err);
+    }
+};
+
+/**
+ * 출고 상세 조회 API
+ * GET /api/release/fwd/:releaseCode
+ * 응답: { status: 'success', data: { header, lines } }
+ */
+const fetchReleaseDetail = async (releaseCode) => {
+    if (!releaseCode) return;
+
+    try {
+        const res = await axios.get(`/api/release/fwd/${releaseCode}`);
+
+        if (res.data?.status !== 'success' || !res.data.data) {
+            console.warn('[Forwarding] 출고 상세 없음');
+            return;
+        }
+
+        const { header, lines } = res.data.data;
+        console.log('[Forwarding] 출고 상세 응답:', header, lines);
+
+        // 헤더 정보 세팅
+        basicInfo.releaseCode = header.releaseCode;
+        basicInfo.releaseDate = formatDate(header.releaseDate);
+        basicInfo.orderCode = header.orderCode;
+        basicInfo.orderDate = header.orderDate ? formatDate(header.orderDate) : '';
+        basicInfo.client = header.client;
+        basicInfo.remark = header.remark ?? '';
+
+        basicInfo.registrant = header.registrantCode || '';
+
+        // 라인 정보 세팅
+        products.value = (lines || []).map((item) => ({
+            productCode: item.productCode,
+            name: item.productName,
+            type: item.type,
+            spec: item.spec,
+            unit: item.unit,
+            orderQty: item.orderQty,
+            releaseQty: item.releaseQty,
+            stockQty: item.stockQty ?? item.currentStock ?? 0,
+            dueDate: item.dueDate ? formatDate(item.dueDate) : ''
+        }));
+    } catch (err) {
+        console.error('[Forwarding] 출고 상세 조회 실패:', err);
+    }
+};
+
+// 🔹 등록자(직원) 목록 조회
+const fetchEmployees = async () => {
+    try {
+        const res = await axios.get('/api/release/fwd/employees');
+        console.log('[Forwarding] 직원 목록 응답:', res.data);
+
+        if (res.data?.status === 'success' && Array.isArray(res.data.data)) {
+            employees.value = res.data.data; // [{ empCode, empName }, ...]
+        } else {
+            employees.value = [];
+        }
+    } catch (err) {
+        console.error('[Forwarding] 직원 목록 조회 실패:', err);
+        employees.value = [];
+    }
+};
+
+// 페이지 진입 시 직원 목록 먼저 가져오기
+onMounted(() => {
+    fetchEmployees();
+});
+
+/* ===========================
+ *  모달 Confirm / Cancel
+ * =========================== */
+
 // 주문 선택 시
-const handleConfirmOrder = (row) => {
+const handleConfirmOrder = async (row) => {
     if (!row) return;
 
     console.log('[Forwarding] 주문 선택:', row);
 
+    // 일단 기본 정보 세팅 (목록 값 기준)
     basicInfo.orderCode = row.orderNo;
     basicInfo.orderDate = row.orderDate;
     basicInfo.client = row.client;
 
-    // TODO: 여기서 주문 상세(제품 목록) 조회 API 호출 후 products 채우기
-    // api.get(`/orders/${row.orderNo}`).then(res => {
-    //   products.value = res.data.items.map(item => ({
-    //     productCode: item.productCode,
-    //     name: item.productName,
-    //     type: item.type,
-    //     spec: item.spec,
-    //     unit: item.unit,
-    //     orderQty: item.orderQty,
-    //     releaseQty: 0,                       // 최초 출고수량은 0
-    //     stockQty: item.currentStock,
-    //     dueDate: item.dueDate
-    //   }));
-    // });
+    onReset();
+
+    // 실제 주문 상세 가져와서 제품 리스트 세팅
+    await fetchOrderDetail(row.orderNo);
+
+    // 주문 모달 닫기
+    showOrderModal.value = false;
 };
 
 // 출고 선택 시 (기존 출고 불러오기)
-const handleConfirmRelease = (row) => {
+const handleConfirmRelease = async (row) => {
     if (!row) return;
 
     console.log('[Forwarding] 출고 선택:', row);
 
+    // 기본정보에 최소 값 셋팅
     basicInfo.releaseCode = row.releaseCode;
     basicInfo.releaseDate = row.releaseDate;
     basicInfo.orderCode = row.orderCode;
     basicInfo.client = row.client;
 
-    // TODO: 여기서 출고 상세(제품별 출고수량) 조회 API 호출 후 products 채우기
-    // api.get(`/releases/${row.releaseCode}`).then(res => {
-    //   const header = res.data.header;
-    //   const lines = res.data.lines;
-    //
-    //   basicInfo.releaseDate = header.releaseDate;
-    //   basicInfo.orderCode = header.orderCode;
-    //   basicInfo.client = header.client;
-    //   basicInfo.remark = header.remark;
-    //
-    //   products.value = lines.map(item => ({
-    //     productCode: item.productCode,
-    //     name: item.productName,
-    //     type: item.type,
-    //     spec: item.spec,
-    //     unit: item.unit,
-    //     orderQty: item.orderQty,
-    //     releaseQty: item.releaseQty,
-    //     stockQty: item.currentStock,
-    //     dueDate: item.dueDate
-    //   }));
-    // });
+    onReset();
+
+    // 실제 출고 상세 가져와서 화면 복원
+    await fetchReleaseDetail(row.releaseCode);
+
+    // 출고 모달 닫기
+    showReleaseModal.value = false;
 };
 
 const handleCancelOrder = () => {
     console.log('주문 선택 모달 취소');
+    showOrderModal.value = false;
 };
 
 const handleCancelRelease = () => {
     console.log('출고 선택 모달 취소');
+    showReleaseModal.value = false;
 };
 
-// 🔹 제품 리스트 (주문/출고 선택 시 API 결과로 채움)
-const products = ref([]);
+/* ===========================
+ *  출고 수량 보정 + 버튼 액션
+ * =========================== */
 
 // 출고수량 보정 (음수/과다 방지)
 const clampReleaseQty = (item) => {
-    if (item.releaseQty == null || isNaN(item.releaseQty)) {
-        item.releaseQty = 0;
+    let qty = Number(item.releaseQty);
+
+    // 숫자 아니거나 음수면 0으로
+    if (isNaN(qty) || qty < 0) {
+        qty = 0;
     }
 
-    if (item.releaseQty < 0) {
-        item.releaseQty = 0;
+    // 이 라인에서 출고할 수 있는 최대 수량
+    const max = maxReleaseQty(item);
+
+    if (qty > max) {
+        qty = max;
     }
 
-    // 주문수량 이상 입력 방지
-    if (item.orderQty != null && item.releaseQty > item.orderQty) {
-        item.releaseQty = item.orderQty;
-    }
-
-    // 재고보다 많이 출고하려고 하면 재고까지로 보정 (필요 없으면 주석처리)
-    if (item.stockQty != null && item.releaseQty > item.stockQty) {
-        item.releaseQty = item.stockQty;
-    }
+    item.releaseQty = qty;
 };
 
-const onDelete = () => {
-    console.log('삭제 클릭 (TODO: 출고전표 삭제 API)');
+// "출고 전 재고" 기준 가져오기
+const getBaseStock = (item) => {
+    const stock = item.baseStockQty ?? item.stockQty ?? 0;
+    return Number(stock) || 0;
+};
+
+// 이 라인에서 최대로 출고할 수 있는 수량(미출고, 재고 둘 다 고려)
+const maxReleaseQty = (item) => {
+    const notReleasedBase = item.notReleasedQty ?? item.orderQty ?? 0; // 주문/미출고 기준
+    const stockBase = getBaseStock(item); // 재고 기준
+
+    // 둘 중 더 작은 값이 "출고 가능 최대 수량"
+    return Math.max(0, Math.min(notReleasedBase, stockBase));
+};
+
+const onDelete = async () => {
+    console.log('삭제 클릭');
+
+    if (!basicInfo.releaseCode) {
+        console.warn('삭제할 출고코드가 없습니다.');
+        return;
+    }
+
+    // TODO: 실제 삭제 API 연결하고 싶으면 아래 주석 해제
+    // try {
+    //   const res = await axios.delete(`/api/release/fwd/${basicInfo.releaseCode}`);
+    //   console.log('삭제 결과:', res.data);
+    //   onReset();
+    // } catch (err) {
+    //   console.error('[Forwarding] 출고전표 삭제 실패:', err);
+    // }
 };
 
 const onReset = () => {
@@ -188,17 +376,27 @@ const onReset = () => {
     console.log('초기화 클릭');
 };
 
-const onSave = () => {
-    console.log('저장 클릭 payload:', {
-        basicInfo: { ...basicInfo },
-        products: products.value
-    });
+const onSave = async () => {
+    const payload = {
+        header: { ...basicInfo },
+        lines: products.value
+    };
 
-    // TODO: 신규/수정 분기 처리
-    // if (!basicInfo.releaseCode) {
-    //   api.post('/releases', { header: basicInfo, lines: products.value });
-    // } else {
-    //   api.put(`/releases/${basicInfo.releaseCode}`, { header: basicInfo, lines: products.value });
+    console.log('저장 클릭 payload:', payload);
+
+    // TODO: 백엔드 저장 기능 완성되면 여기서 POST/PUT 분기
+    // try {
+    //   if (!basicInfo.releaseCode) {
+    //     // 신규
+    //     const res = await axios.post('/api/release/fwd', payload);
+    //     console.log('출고전표 생성 결과:', res.data);
+    //   } else {
+    //     // 수정
+    //     const res = await axios.put(`/api/release/fwd/${basicInfo.releaseCode}`, payload);
+    //     console.log('출고전표 수정 결과:', res.data);
+    //   }
+    // } catch (err) {
+    //   console.error('[Forwarding] 출고전표 저장 실패:', err);
     // }
 };
 </script>
@@ -277,7 +475,12 @@ const onSave = () => {
                 <!-- 등록자 -->
                 <div class="form-field col-2">
                     <label class="form-label">등록자</label>
-                    <input v-model="basicInfo.registrant" type="text" class="form-input" readonly />
+                    <select v-model="basicInfo.registrant" class="form-input">
+                        <option value="">등록자를 선택하세요</option>
+                        <option v-for="emp in employees" :key="emp.empCode" :value="emp.empCode">
+                            {{ emp.empName }}
+                        </option>
+                    </select>
                 </div>
 
                 <!-- 비고 (전체 폭) -->
@@ -302,7 +505,7 @@ const onSave = () => {
                             <th>단위</th>
                             <th>주문수량</th>
                             <th>출고수량</th>
-                            <th>남은수량</th>
+                            <th>미출고수량</th>
                             <th>현 재고</th>
                             <th>납기일</th>
                         </tr>
@@ -324,17 +527,20 @@ const onSave = () => {
 
                             <!-- 출고수량 입력 -->
                             <td class="num">
-                                <input type="number" v-model.number="item.releaseQty" min="0" :max="item.orderQty" class="qty-input" @blur="clampReleaseQty(item)" />
+                                <input type="number" v-model.number="item.releaseQty" min="0" :max="maxReleaseQty(item)" :disabled="maxReleaseQty(item) === 0" class="qty-input" @blur="clampReleaseQty(item)" />
                             </td>
 
                             <!-- 남은수량: 주문수량 - 출고수량 -->
                             <td class="num">
-                                {{ (item.orderQty || 0) - (item.releaseQty || 0) }}
+                                {{ Math.max(0, ((item.notReleasedQty ?? item.orderQty) || 0) - (item.releaseQty || 0)) }}
                             </td>
 
-                            <!-- 현재 재고 -->
-                            <td class="num">{{ item.stockQty }}</td>
+                            <!-- 현 재고 (출고 후 예상 재고) -->
+                            <td class="num">
+                                {{ Math.max(0, ((item.baseStockQty ?? item.stockQty) || 0) - (item.releaseQty || 0)) }}
+                            </td>
 
+                            <!-- 납기일 -->
                             <td>{{ item.dueDate }}</td>
                         </tr>
                     </tbody>
@@ -354,9 +560,9 @@ const onSave = () => {
     padding: 2rem;
     display: flex;
     flex-direction: column;
-    height: 100%; /* 상위 레이아웃이 100vh 기준이면 내부에서 잘 맞음 */
+    height: 100%;
     box-sizing: border-box;
-    overflow: hidden; /* 페이지 자체 스크롤 없음 */
+    overflow: hidden;
 }
 
 .forward-header {
@@ -428,7 +634,7 @@ const onSave = () => {
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 0; /* flex 컨테이너에서 자식이 스크롤 되게 하려면 필요 */
+    min-height: 0;
 }
 
 .section-header {

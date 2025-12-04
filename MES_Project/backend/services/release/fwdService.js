@@ -9,54 +9,15 @@ const fwdSQL = require("../../database/sqlList.js");
 /**
  * 주문 목록 조회 (모달용)
  * 라우터: GET /api/release/fwd/orders
+ * query: keyword, fromDate, toDate, client, status
  */
-async function getOrderList(params) {
-  const {
-    keyword = "",
-    fromDate = "",
-    toDate = "",
-    client = "",
-    status = "",
-  } = params;
-
+async function getOrderList(keyword) {
   const conn = await db.getConnection();
 
   try {
-    const where = [];
-    const values = [];
+    const like = `%${(keyword || "").trim()}%`;
 
-    if (keyword) {
-      where.push(
-        `(o.order_no LIKE ? OR o.order_name LIKE ? OR c.client_name LIKE ?)`
-      );
-      const like = `%${keyword}%`;
-      values.push(like, like, like);
-    }
-
-    if (fromDate) {
-      where.push(`o.order_date >= ?`);
-      values.push(fromDate);
-    }
-
-    if (toDate) {
-      where.push(`o.order_date <= ?`);
-      values.push(toDate);
-    }
-
-    if (client) {
-      where.push(`c.client_name LIKE ?`);
-      values.push(`%${client}%`);
-    }
-
-    if (status) {
-      where.push(`o.status = ?`);
-      values.push(status);
-    }
-
-    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
-
-    const listSql = fwdSQL.SELECT_ORDER_LIST.replace("/*WHERE*/", whereSQL);
-    const [rows] = await conn.query(listSql, values);
+    const rows = await conn.query(fwdSQL.SELECT_ORDER_LIST, [like, like, like]);
 
     return rows;
   } finally {
@@ -72,38 +33,49 @@ async function getOrderDetail(orderNo) {
   const conn = await db.getConnection();
 
   try {
-    // 헤더
-    const [headerRows] = await conn.query(fwdSQL.SELECT_ORDER_HEADER, [
-      orderNo,
-    ]);
-    if (!headerRows.length) return null;
+    console.log("[getOrderDetail] orderNo:", orderNo);
 
-    const header = headerRows[0];
+    // 1) 헤더 조회
+    const headerRows = await conn.query(fwdSQL.SELECT_ORDER_HEADER, [orderNo]);
+    console.log("[getOrderDetail] headerRows:", headerRows);
 
-    // 라인(아이템)
-    const [itemRows] = await conn.query(fwdSQL.SELECT_ORDER_ITEMS, [orderNo]);
+    if (!headerRows || headerRows.length === 0) {
+      console.log("[getOrderDetail] no header found for", orderNo);
+      return null;
+    }
 
-    return {
-      header: {
-        orderNo: header.order_no,
-        orderDate: header.order_date,
-        client: header.client_name,
-        dueDate: header.due_date,
-        status: header.status,
-        priority: header.priority,
-      },
-      items: itemRows.map((r) => ({
-        productCode: r.product_code,
-        productName: r.product_name,
-        type: r.product_type,
-        spec: r.spec,
-        unit: r.unit,
-        orderQty: r.order_qty,
-        currentStock: r.current_stock,
-        notReleasedQty: r.not_released_qty,
-        dueDate: r.due_date,
-      })),
+    const h = headerRows[0];
+
+    const header = {
+      orderNo: h.orderNo,
+      orderDate: h.orderDate, // 이미 YYYY-MM-DD 포맷
+      client: h.client,
+      dueDate: h.dueDate,
+      status: h.status,
+      priority: h.priority,
     };
+
+    // 2) 라인(아이템) 조회
+    const itemRows = await conn.query(fwdSQL.SELECT_ORDER_ITEMS, [orderNo]);
+    console.log("[getOrderDetail] itemRows:", itemRows);
+
+    const items = (itemRows || []).map((r) => ({
+      productCode: r.productCode,
+      productName: r.productName,
+      type: r.type,
+      spec: r.spec,
+      unit: r.unit,
+      orderQty: r.orderQty,
+      stockQty: r.stockQty, // 프론트에서 stockQty ?? currentStock ?? 0
+      currentStock: r.currentStock, // 혹시 쓸일 생기면 사용
+      notReleasedQty: r.notReleasedQty,
+      dueDate: r.dueDate, // 프론트에서 formatDate 한 번 더 태웁니다
+    }));
+
+    const result = { header, items };
+    console.log("[getOrderDetail] result:", result);
+
+    return result;
   } finally {
     conn.release();
   }
@@ -116,8 +88,9 @@ async function getOrderDetail(orderNo) {
 /**
  * 출고전표 목록 조회 (모달용)
  * 라우터: GET /api/release/fwd
+ * query: keyword, fromDate, toDate, client, status
  */
-async function getReleaseList(params) {
+async function getReleaseList(params = {}) {
   const {
     keyword = "",
     fromDate = "",
@@ -126,46 +99,48 @@ async function getReleaseList(params) {
     status = "",
   } = params;
 
+  const where = [];
+  const values = [];
+
+  if (keyword) {
+    // 🔹 출고번호 / 주문번호 / 거래처명 검색
+    where.push(
+      "(pb.poutbnd_code LIKE ? OR orq.ord_code LIKE ? OR c.client_name LIKE ?)"
+    );
+    const like = `%${keyword}%`;
+    values.push(like, like, like);
+  }
+
+  if (fromDate) {
+    where.push("pb.deadline >= ?");
+    values.push(fromDate);
+  }
+
+  if (toDate) {
+    where.push("pb.deadline <= ?");
+    values.push(toDate);
+  }
+
+  if (client) {
+    where.push("c.client_name LIKE ?");
+    values.push(`%${client}%`);
+  }
+
+  if (status) {
+    where.push("pb.stat = ?");
+    values.push(status);
+  }
+
+  const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+  // 🔹 sql의 /*WHERE*/ 자리 치환
+  const listSql = fwdSQL.SELECT_RELEASE_LIST.replace("/*WHERE*/", whereSQL);
+
   const conn = await db.getConnection();
-
   try {
-    const where = [];
-    const values = [];
-
-    if (keyword) {
-      where.push(
-        `(r.release_code LIKE ? OR r.order_code LIKE ? OR c.client_name LIKE ?)`
-      );
-      const like = `%${keyword}%`;
-      values.push(like, like, like);
-    }
-
-    if (fromDate) {
-      where.push(`r.release_date >= ?`);
-      values.push(fromDate);
-    }
-
-    if (toDate) {
-      where.push(`r.release_date <= ?`);
-      values.push(toDate);
-    }
-
-    if (client) {
-      where.push(`c.client_name LIKE ?`);
-      values.push(`%${client}%`);
-    }
-
-    if (status) {
-      where.push(`r.status = ?`);
-      values.push(status);
-    }
-
-    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
-
-    const listSql = fwdSQL.SELECT_RELEASE_LIST.replace("/*WHERE*/", whereSQL);
-    const [rows] = await conn.query(listSql, values);
-
-    return rows;
+    // mariadb 쓰고 있으니까 구조분해 말고 그대로
+    const rows = await conn.query(listSql, values);
+    return rows; // [{ releaseCode, releaseDate, orderCode, client, status, totalQty }, ...]
   } finally {
     conn.release();
   }
@@ -176,181 +151,91 @@ async function getReleaseList(params) {
  * 라우터: GET /api/release/fwd/:releaseCode
  */
 async function getReleaseDetail(releaseCode) {
+  console.log("[getReleaseDetail] releaseCode:", releaseCode);
   const conn = await db.getConnection();
 
   try {
-    const [headerRows] = await conn.query(fwdSQL.SELECT_RELEASE_HEADER, [
+    // 1) 헤더 조회
+    const headerRows = await conn.query(fwdSQL.SELECT_RELEASE_HEADER, [
       releaseCode,
     ]);
-    if (!headerRows.length) return null;
-    const header = headerRows[0];
+    console.log("[getReleaseDetail] headerRows:", headerRows);
 
-    const [lineRows] = await conn.query(fwdSQL.SELECT_RELEASE_LINES, [
-      releaseCode,
-    ]);
-
-    return {
-      header: {
-        releaseCode: header.release_code,
-        releaseDate: header.release_date,
-        orderCode: header.order_code,
-        client: header.client_name,
-        remark: header.remark,
-        status: header.status,
-      },
-      lines: lineRows.map((r) => ({
-        lineNo: r.line_no,
-        productCode: r.product_code,
-        productName: r.product_name,
-        type: r.product_type,
-        spec: r.spec,
-        unit: r.unit,
-        orderQty: r.order_qty,
-        releaseQty: r.release_qty,
-        stockQty: r.current_stock,
-        dueDate: r.due_date,
-      })),
-    };
-  } finally {
-    conn.release();
-  }
-}
-
-/**
- * 출고전표 생성
- * 라우터: POST /api/release/fwd
- */
-async function createRelease(payload) {
-  const { header, lines } = payload;
-
-  const conn = await db.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    // 1) 출고번호 채번 (프로젝트 규칙에 맞게 구현)
-    const [codeRows] = await conn.query(fwdSQL.GENERATE_RELEASE_CODE);
-    const releaseCode = codeRows[0].release_code;
-
-    // 2) 헤더 저장
-    const headerParams = [
-      releaseCode,
-      header.orderCode,
-      header.releaseDate,
-      header.client,
-      header.registrant,
-      header.remark || "",
-      header.status || "완료", // 상태 기본값 예시
-    ];
-
-    await conn.query(fwdSQL.INSERT_RELEASE_HEADER, headerParams);
-
-    // 3) 라인 저장
-    for (const line of lines) {
-      const lineParams = [
-        releaseCode,
-        line.productCode,
-        line.orderQty,
-        line.releaseQty,
-        line.stockQty,
-        line.dueDate,
-      ];
-      await conn.query(fwdSQL.INSERT_RELEASE_LINE, lineParams);
-
-      // 🔸 TODO: 재고 차감 / 주문 미출고수량 업데이트 등의 로직이 필요하면 여기서 추가
-      // await conn.query(fwdSQL.UPDATE_STOCK_BY_RELEASE, [line.releaseQty, line.productCode]);
-      // await conn.query(fwdSQL.UPDATE_ORDER_NOT_RELEASED_QTY, [line.releaseQty, header.orderCode, line.productCode]);
+    if (!headerRows || headerRows.length === 0) {
+      return null;
     }
 
-    await conn.commit();
+    const h = headerRows[0];
 
-    return {
-      releaseCode,
+    const header = {
+      releaseCode: h.releaseCode,
+      releaseDate: h.releaseDate, // 'YYYY-MM-DD'
+      orderCode: h.orderCode,
+      client: h.client,
+      remark: h.remark,
+      status: h.status,
+      orderDate: h.orderDate, // 'YYYY-MM-DD'
+      registrantCode: h.registrantCode,
+      registrantName: h.registrantName,
     };
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
-}
 
-/**
- * 출고전표 수정
- * 라우터: PUT /api/release/fwd/:releaseCode
- */
-async function updateRelease(releaseCode, payload) {
-  const { header, lines } = payload;
-
-  const conn = await db.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    // 1) 헤더 수정
-    const headerParams = [
-      header.releaseDate,
-      header.client,
-      header.remark || "",
-      header.status || "완료",
-      releaseCode,
-    ];
-    await conn.query(fwdSQL.UPDATE_RELEASE_HEADER, headerParams);
-
-    // 2) 기존 라인 삭제 후 재입력 (간단하게 가는 방식)
-    await conn.query(fwdSQL.DELETE_RELEASE_LINES, [releaseCode]);
-
-    for (const line of lines) {
-      const lineParams = [
-        releaseCode,
-        line.productCode,
-        line.orderQty,
-        line.releaseQty,
-        line.stockQty,
-        line.dueDate,
-      ];
-      await conn.query(fwdSQL.INSERT_RELEASE_LINE, lineParams);
-
-      // 🔸 TODO: 재고/주문 상태 재조정 필요 시 이 부분 구현
-    }
-
-    await conn.commit();
-
-    return {
-      releaseCode,
-    };
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
-}
-
-/**
- * 출고전표 삭제 (또는 취소 처리)
- * 라우터: DELETE /api/release/fwd/:releaseCode
- */
-async function deleteRelease(releaseCode) {
-  const conn = await db.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    // 🔹 실제 삭제가 싫으면 UPDATE 로 상태만 '취소' 처리하는 SQL을 만들어도 됨
-    await conn.query(fwdSQL.DELETE_RELEASE_LINES, [releaseCode]);
-    const [result] = await conn.query(fwdSQL.DELETE_RELEASE_HEADER, [
+    // 2) 라인(상세) 조회
+    const lineRows = await conn.query(fwdSQL.SELECT_RELEASE_LINES, [
       releaseCode,
     ]);
+    console.log("[getReleaseDetail] lineRows:", lineRows);
 
-    await conn.commit();
+    const lines = (lineRows || []).map((r) => ({
+      lineNo: r.line_no,
+      productCode: r.product_code,
+      productName: r.product_name,
+      type: r.product_type,
+      spec: r.spec,
+      unit: r.unit,
+      orderQty: r.order_qty,
+      releaseQty: r.release_qty,
+      stockQty: r.current_stock,
+      dueDate: r.due_date,
+    }));
 
-    return {
-      affectedRows: result.affectedRows,
-    };
-  } catch (err) {
-    await conn.rollback();
-    throw err;
+    return { header, lines };
   } finally {
     conn.release();
   }
+}
+
+/* ===========================
+ *  직원(등록자) 목록 조회
+ *  라우터: GET /api/release/fwd/employees
+ * =========================== */
+async function getEmployeeList() {
+  const conn = await db.getConnection();
+
+  try {
+    const rows = await conn.query(fwdSQL.SELECT_EMPLOYEE_LIST, []);
+    console.log("[getEmployeeList] rows.length =", rows.length);
+    return rows; // [{ empCode, empName }, ...]
+  } finally {
+    conn.release();
+  }
+}
+
+/* ===========================
+ *  출고전표 생성/수정/삭제
+ *  👉 poutbnd_tbl 구조가 "헤더+라인"을 어떻게 가질지
+ *     아직 명확하지 않아서 일단 Not Implemented 처리
+ * =========================== */
+
+async function createRelease() {
+  throw new Error("createRelease is not implemented yet.");
+}
+
+async function updateRelease(/* releaseCode, payload */) {
+  throw new Error("updateRelease is not implemented yet.");
+}
+
+async function deleteRelease(/* releaseCode */) {
+  throw new Error("deleteRelease is not implemented yet.");
 }
 
 module.exports = {
@@ -361,4 +246,5 @@ module.exports = {
   createRelease,
   updateRelease,
   deleteRelease,
+  getEmployeeList,
 };

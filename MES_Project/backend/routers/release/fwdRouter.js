@@ -12,30 +12,17 @@ const fwdService = require("../../services/release/fwdService.js");
  * GET /api/release/fwd/orders
  */
 router.get("/orders", async (req, res) => {
-  try {
-    const {
-      keyword = "",
-      fromDate = "",
-      toDate = "",
-      client = "",
-      status = "",
-    } = req.query;
+  const { keyword = "" } = req.query;
 
-    // ✅ 페이징 없이 단순 리스트만
-    const result = await fwdService.getOrderList({
-      keyword,
-      fromDate,
-      toDate,
-      client,
-      status,
-    });
+  try {
+    const rows = await fwdService.getOrderList(keyword);
 
     return res.json({
       status: "success",
-      data: result, // 배열 rows 그대로
+      data: rows,
     });
   } catch (err) {
-    console.error("[fwdRouter] GET /orders error:", err);
+    console.error("[Forwarding] 주문 목록 조회 실패:", err);
     return res.status(500).json({
       status: "error",
       message: "주문 목록 조회 중 오류가 발생했습니다.",
@@ -59,16 +46,19 @@ router.get("/orders/:orderNo", async (req, res) => {
     }
 
     const result = await fwdService.getOrderDetail(orderNo);
+    console.log("[fwdRouter] /orders/:orderNo result:", result);
+
     if (!result) {
-      return res.status(404).json({
-        status: "fail",
-        message: "해당 주문을 찾을 수 없습니다.",
+      // 개발 단계에서는 200 + data: null 로 처리
+      return res.json({
+        status: "success",
+        data: null,
       });
     }
 
     return res.json({
       status: "success",
-      data: result, // { header, items: [] }
+      data: result, // { header, items }
     });
   } catch (err) {
     console.error("[fwdRouter] GET /orders/:orderNo error:", err);
@@ -98,7 +88,6 @@ router.get("/", async (req, res) => {
       status = "",
     } = req.query;
 
-    // ✅ 페이징 없이 단순 리스트만
     const result = await fwdService.getReleaseList({
       keyword,
       fromDate,
@@ -121,6 +110,27 @@ router.get("/", async (req, res) => {
 });
 
 /**
+ * 등록자(직원) 목록 조회
+ * GET /api/release/fwd/employees
+ */
+router.get("/employees", async (req, res) => {
+  try {
+    const rows = await fwdService.getEmployeeList();
+
+    return res.json({
+      status: "success",
+      data: rows, // [{ empCode, empName }, ...]
+    });
+  } catch (err) {
+    console.error("[Forwarding] 직원 목록 조회 실패:", err);
+    return res.status(500).json({
+      status: "error",
+      message: "직원 목록 조회 중 오류가 발생했습니다.",
+    });
+  }
+});
+
+/**
  * 출고전표 단건 조회 (헤더 + 라인)
  * GET /api/release/fwd/:releaseCode
  */
@@ -136,16 +146,18 @@ router.get("/:releaseCode", async (req, res) => {
     }
 
     const result = await fwdService.getReleaseDetail(releaseCode);
+    console.log("[fwdRouter] /:releaseCode result:", result);
+
     if (!result) {
-      return res.status(404).json({
-        status: "fail",
-        message: "해당 출고전표를 찾을 수 없습니다.",
+      return res.json({
+        status: "success",
+        data: null,
       });
     }
 
     return res.json({
       status: "success",
-      data: result, // { header, lines: [] }
+      data: result, // { header, lines }
     });
   } catch (err) {
     console.error("[fwdRouter] GET /:releaseCode error:", err);
@@ -156,11 +168,7 @@ router.get("/:releaseCode", async (req, res) => {
   }
 });
 
-/**
- * 출고전표 등록
- * POST /api/release/fwd
- * body: { header: {...}, lines: [...] }
- */
+// 출고전표 등록
 router.post("/", async (req, res) => {
   try {
     const { header, lines } = req.body;
@@ -170,14 +178,14 @@ router.post("/", async (req, res) => {
         status: "fail",
         message: "header 및 lines 데이터가 필요합니다.",
       });
+
+      const created = await fwdService.createRelease({ header, lines });
+
+      return res.status(201).json({
+        status: "success",
+        data: created, // { releaseCode, ... }
+      });
     }
-
-    const created = await fwdService.createRelease({ header, lines });
-
-    return res.status(201).json({
-      status: "success",
-      data: created, // { releaseCode, ... }
-    });
   } catch (err) {
     console.error("[fwdRouter] POST / (create release) error:", err);
     return res.status(500).json({
@@ -187,76 +195,66 @@ router.post("/", async (req, res) => {
   }
 });
 
-/**
- * 출고전표 수정
- * PUT /api/release/fwd/:releaseCode
- * body: { header: {...}, lines: [...] }
- */
-router.put("/:releaseCode", async (req, res) => {
-  try {
-    const { releaseCode } = req.params;
-    const { header, lines } = req.body;
+// // 출고전표 수정
+// router.put("/:releaseCode", async (req, res) => {
+//   try {
+//     const { releaseCode } = req.params;
+//     const { header, lines } = req.body;
+//     if (!releaseCode) {
+//       return res.status(400).json({
+//         status: "fail",
+//         message: "releaseCode가 필요합니다.",
+//       });
+//     }
+//     if (!header || !Array.isArray(lines) || lines.length === 0) {
+//       return res.status(400).json({
+//         status: "fail",
+//         message: "header 및 lines 데이터가 필요합니다.",
+//       });
+//     }
 
-    if (!releaseCode) {
-      return res.status(400).json({
-        status: "fail",
-        message: "releaseCode가 필요합니다.",
-      });
-    }
+//     const updated = await fwdService.updateRelease(releaseCode, {
+//       header,
+//       lines,
+//     });
 
-    if (!header || !Array.isArray(lines) || lines.length === 0) {
-      return res.status(400).json({
-        status: "fail",
-        message: "header 및 lines 데이터가 필요합니다.",
-      });
-    }
+//     return res.json({
+//       status: "success",
+//       data: updated,
+//     });
+//   } catch (err) {
+//     console.error("[fwdRouter] PUT /:releaseCode error:", err);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "출고전표 수정 중 오류가 발생했습니다.",
+//     });
+//   }
+// });
 
-    const updated = await fwdService.updateRelease(releaseCode, {
-      header,
-      lines,
-    });
+// // 출고전표 삭제
+// router.delete("/:releaseCode", async (req, res) => {
+//   try {
+//     const { releaseCode } = req.params;
 
-    return res.json({
-      status: "success",
-      data: updated,
-    });
-  } catch (err) {
-    console.error("[fwdRouter] PUT /:releaseCode error:", err);
-    return res.status(500).json({
-      status: "error",
-      message: "출고전표 수정 중 오류가 발생했습니다.",
-    });
-  }
-});
+//     if (!releaseCode) {
+//       return res.status(400).json({
+//         status: "fail",
+//         message: "releaseCode가 필요합니다.",
+//       });
+//     }
 
-/**
- * 출고전표 삭제(또는 취소 플래그 업데이트)
- * DELETE /api/release/fwd/:releaseCode
- */
-router.delete("/:releaseCode", async (req, res) => {
-  try {
-    const { releaseCode } = req.params;
-
-    if (!releaseCode) {
-      return res.status(400).json({
-        status: "fail",
-        message: "releaseCode가 필요합니다.",
-      });
-    }
-
-    const result = await fwdService.deleteRelease(releaseCode);
-
-    return res.json({
-      status: "success",
-      data: result, // { affectedRows }
-    });
-  } catch (err) {
-    console.error("[fwdRouter] DELETE /:releaseCode error:", err);
-    return res.status(500).json({
-      status: "error",
-      message: "출고전표 삭제 중 오류가 발생했습니다.",
-    });
-  }
-});
+//     const result = await fwdService.deleteRelease(releaseCode);
+//     return res.json({
+//       status: "success",
+//       data: result, // { affectedRows }
+//     });
+//   } catch (err) {
+//     console.error("[fwdRouter] DELETE /:releaseCode error:", err);
+//     return res.status(500).json({
+//       status: "error",
+//       message: "출고전표 삭제 중 오류가 발생했습니다.",
+//     });
+//   }
+// });
 
 module.exports = router;
