@@ -14,7 +14,7 @@ const model = ref([
                 items: [
                     { label: '제품 및 BOM 등록', to: '/baseinfo/bom' },
                     { label: '라인 정보', to: '' },
-                    { label: '공정 흐름도 등록', to: '/process' }
+                    { label: '공정 흐름도 등록', to: '/baseinfo/process' }
                 ]
             },
             {
@@ -48,8 +48,8 @@ const model = ref([
                     {
                         label: '작업 진행',
                         to: '/Production/work'
-                    }
-                  ,{
+                    },
+                    {
                         label: '작업지시서목록',
                         to: '/production/productionPlan'
                     }
@@ -91,7 +91,7 @@ const model = ref([
                         label: '발주서 목록',
                         to: '/poList'
                     },
-                  {
+                    {
                         label: '입고등록',
                         to: { name: 'InboundRegistration' }
                     },

@@ -4,10 +4,11 @@ const Productionwork = require("./sqls/production/production_work.js");
 const order = require("./sqls/orderSQL.js");
 const common = require("./sqls/commonSQL.js");
 const po = require("./sqls/po.js");
+const process = require("./sqls/process.js");
 module.exports = {
-  ...sample,
   ...Productionwork,
   ...order,
   ...common,
   ...po,
+  ...process,
 };
