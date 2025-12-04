@@ -1,9 +1,13 @@
 <script setup>
 import { onBeforeMount, ref } from 'vue';
 import axios from 'axios';
+import { useWorkStore } from '@/stores/workStore';
+const workStore = useWorkStore();
+const workInfo = workStore.selectedWork;
 let workList = ref([]);
 const getWorkList = async () => {
-    let result = await axios.get(`/api/work/list`).catch((err) => console.log('작업진행도 리스트' + err));
+    console.log(workInfo.prdrcode);
+    let result = await axios.get(`/api/work/list/${workInfo.prdrcode}`).catch((err) => console.log('작업진행도 리스트' + err));
     const res = result.data.data.result;
     workList.value = JSON.parse(JSON.stringify(res));
     console.log(workList.value);
@@ -36,15 +40,15 @@ onBeforeMount(() => {
                 <h2 class="text-xl font-semibold mb-2 text-gray-700">작업 지시 정보</h2>
                 <div class="flex flex-col gap-2">
                     <label for="name1" class="text-sm font-medium text-gray-500">작업지시코드</label>
-                    <InputText id="name1" type="text" readonly="true" value="WO-20250530-001" class="p-2 border rounded-md bg-gray-50" />
+                    <InputText id="name1" type="text" readonly="true" :value="`${workInfo.code}`" class="p-2 border rounded-md bg-gray-50" />
                 </div>
                 <div class="flex flex-col gap-2">
                     <label for="email1" class="text-sm font-medium text-gray-500">제품명</label>
-                    <InputText id="email1" type="text" readonly="true" value="맛있는 과자 A" class="p-2 border rounded-md bg-gray-50" />
+                    <InputText id="email1" type="text" readonly="true" :value="`${workInfo.name}`" class="p-2 border rounded-md bg-gray-50" />
                 </div>
                 <div class="flex flex-col gap-2">
                     <label for="age1" class="text-sm font-medium text-gray-500">라인</label>
-                    <InputText id="age1" type="text" readonly="true" value="Line A-01" class="p-2 border rounded-md bg-gray-50" />
+                    <InputText id="age1" type="text" readonly="true" :value="`${workInfo.line}`" class="p-2 border rounded-md bg-gray-50" />
                 </div>
             </div>
         </div>
