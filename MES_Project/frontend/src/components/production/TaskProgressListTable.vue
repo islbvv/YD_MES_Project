@@ -1,11 +1,13 @@
 <script setup>
 import { computed, defineProps, defineEmits } from 'vue';
+import { useWorkStore } from '@/stores/workStore.js';
 import { useRouter } from 'vue-router';
 const router = useRouter();
-const goLink = () => {
-    router.push('/Production/productionwork');
+const workStore = useWorkStore();
+const goLink = (row) => {
+    workStore.setSelectedWork(row); // row 저장
+    router.push('/Production/productionwork'); // 이동
 };
-
 const props = defineProps({
     // rows 배열은 이제 다음 필드를 포함해야 합니다:
     // workOrderNo, productName, processName, processType, workDate, startTime, status, plannedCompletion, priority
@@ -82,7 +84,7 @@ const downloadExcel = () => {
                         <td colspan="10" class="empty">검색 결과가 없습니다.</td>
                     </tr>
 
-                    <tr v-for="row in props.rows" :key="row.id" @click="goLink()">
+                    <tr v-for="row in props.rows" :key="row.id" @click="goLink(row)">
                         <td>
                             <input v-model="row.checked" type="checkbox" />
                         </td>
@@ -136,6 +138,9 @@ const downloadExcel = () => {
 .table-wrap {
     width: 100%;
     overflow-x: auto;
+}
+tr {
+    cursor: pointer;
 }
 
 .result-table {
