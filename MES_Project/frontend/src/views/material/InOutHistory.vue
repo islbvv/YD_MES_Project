@@ -265,7 +265,7 @@ const getStatusSeverity = (status) => {
 
                 <Column field="procDate" header="처리일자" sortable headerClass="center-header" bodyClass="text-center" style="width: 8rem"></Column>
                 <Column field="matCode" header="자재코드" sortable headerClass="center-header" bodyClass="text-center" style="width: 8rem"></Column>
-                <Column field="matName" header="자재명" sortable headerClass="center-header" style="min-width: 12rem; font-weight: 600"></Column>
+                <Column field="matName" header="자재명" sortable headerClass="center-header" bodyClass="text-center" style="width: 8rem"></Column>
 
                 <Column field="reqQty" header="요청수량" sortable headerClass="center-header" bodyClass="text-center" style="width: 7rem">
                     <template #body="{ data }">
@@ -285,12 +285,15 @@ const getStatusSeverity = (status) => {
 
                 <Column field="status" header="처리상태" sortable headerClass="center-header" bodyClass="text-center" style="width: 8rem">
                     <template #body="{ data }">
-                        <Tag :value="getStatusLabel(data.status)" :severity="getStatusSeverity(data.status)" />
+                        <div class="status-chip">
+                            <span class="status-dot" :class="`status-${data.status.toLowerCase()}`"></span>
+                            <span class="status-text">{{ getStatusLabel(data.status) }}</span>
+                        </div>
                     </template>
                 </Column>
 
                 <Column field="manager" header="담당자" sortable headerClass="center-header" bodyClass="text-center" style="width: 6rem"></Column>
-                <Column field="remark" header="비고" headerClass="center-header" style="min-width: 10rem"></Column>
+                <Column field="remark" header="비고" headerClass="center-header" bodyClass="text-center" style="width: 6rem"></Column>
             </DataTable>
         </div>
     </div>
@@ -420,6 +423,37 @@ const getStatusSeverity = (status) => {
 /* 테이블 내용 중앙 정렬 */
 :deep(.text-center) {
     text-align: center !important;
+}
+/* 처리상태 점 + 텍스트 스타일 */
+.status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* 상태별 색상 */
+.status-completed {
+    background-color: #16a34a; /* 녹색 */
+}
+
+.status-pending {
+    background-color: #eab308; /* 노란색 */
+}
+
+.status-cancelled {
+    background-color: #ef4444; /* 빨간색 */
+}
+
+.status-text {
+    font-size: 0.85rem;
+    color: #374151;
 }
 </style>
 
