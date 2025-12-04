@@ -56,21 +56,6 @@ const unitMap = {
 const openProductModal = () => {
     isModalVisible.value = true;
 };
-const onSelectSubMaterial = (materials) => {
-    const nextId = subMaterialList.value.length + 1;
-
-    materials.forEach((m, index) => {
-        subMaterialList.value.push({
-            id: nextId + index,
-            materialCode: m.prod_code,
-            materialName: m.prod_name,
-            materialType: m.prod_type, // i1~i4
-            qty: 0,
-            unit: '',
-            lossRate: ''
-        });
-    });
-};
 
 const onProductSelect = (selectedProduct) => {
     (searchForm.value.itemCode = selectedProduct.prod_code), (searchForm.value.itemName = selectedProduct.prod_name);

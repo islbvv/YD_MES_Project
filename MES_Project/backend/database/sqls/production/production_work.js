@@ -21,7 +21,7 @@ FROM
     INNER JOIN po_tbl po ON ppd.po_code = po.po_code
     LEFT JOIN eq_tbl eq ON ld.eq_code = eq.eq_code
 WHERE 
-    pd.prdr_code = 'PRDR-001'
+    pd.prdr_code = ?
 ORDER BY 
     ppd.no, pd.start_date;
 `,
@@ -32,9 +32,11 @@ ORDER BY
     wk.line_code as line,
     wk.start_date as start,
     wk.end_date as end,
-    wk.stat as stat
+    wk.stat as stat,
+    prdr.prdr_code as prdrcode
 from
-    wko_tbl wk INNER JOIN prod_tbl prod on wk.prod_code = prod.prod_code;
+    wko_tbl wk INNER JOIN prod_tbl prod on wk.prod_code = prod.prod_code
+    INNER JOIN prdr_tbl prdr on prdr.work_order_code = wk.wko_code;
     `,
   work_performance: `
 SELECT 

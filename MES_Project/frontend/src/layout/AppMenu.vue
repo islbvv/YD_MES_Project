@@ -55,7 +55,7 @@ const model = ref([
                     },
                     {
                         label: '작업 진행',
-                        to: '/Production/productionwork'
+                        to: '/Production/work'
                     },
                     {
                         label: '작업 진행 목록',

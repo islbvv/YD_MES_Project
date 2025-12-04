@@ -1,10 +1,10 @@
 const { getConnection } = require("../database/mapper.js");
 const sqlList = require("../database/sqlList.js");
 // 생산 진행 조회
-exports.production_work = async () => {
+exports.production_work = async (code) => {
   const conn = await getConnection();
   try {
-    const result = await conn.query(sqlList.work, []);
+    const result = await conn.query(sqlList.work, [code]);
     console.log(result);
     return {
       result,
