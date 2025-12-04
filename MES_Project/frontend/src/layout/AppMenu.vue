@@ -79,6 +79,14 @@ const model = ref([
                     {
                         label: '품질검사 지시관리',
                         to: '/quality/instructions-management'
+                    },
+                    {
+                        label: '품질검사결과 목록',
+                        to: '/qc/list'
+                    },
+                    {
+                        label: '품질검사결과 관리',
+                        to: '/qc/manage'
                     }
                 ]
             },
