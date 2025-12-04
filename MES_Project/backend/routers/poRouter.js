@@ -17,28 +17,26 @@ router.get("/mate", async (req, res, next) => {
   }
 });
 
-// 발주 단건 조회
-router.get("/:purchaseCode", async (req, res, next) => {
+// 발주 자재별 목록 조회
+router.get("/list", async (req, res) => {
   try {
-    const { purchaseCode } = req.params;
-    const data = await poService.getPoByCode(purchaseCode);
-
-    if (!data) {
-      return res.status(404).json({
-        code: "E404",
-        message: "해당 발주서를 찾을 수 없습니다.",
-      });
-    }
+    const { purchaseCode } = req.query;
+    const rows = await poService.getPoListFlat(purchaseCode);
 
     res.json({
-      code: "S200",
-      data,
+      success: true,
+      data: rows,
     });
   } catch (err) {
-    next(err);
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: "발주 목록 조회 중 오류가 발생했습니다.",
+    });
   }
 });
 
+// 발주 삭제
 router.delete("/:purchaseCode", async (req, res, next) => {
   try {
     const { purchaseCode } = req.params;
@@ -76,7 +74,7 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-//  발주 저장 (신규/수정 공통)
+//  발주 저장/수정
 router.post("/", async (req, res, next) => {
   try {
     const poDto = req.body;
@@ -91,4 +89,128 @@ router.post("/", async (req, res, next) => {
   }
 });
 
+router.get("/mpr/next-code", async (req, res) => {
+  try {
+    const code = await poService.getNextReqCode();
+    res.json({ success: true, code });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "요청번호 생성 실패" });
+  }
+});
+
+// 직원 부서 조회
+router.get("/emp/dept", async (req, res) => {
+  try {
+    const empCode = req.query.empCode;
+
+    if (!empCode) {
+      return res.status(400).json({
+        success: false,
+        message: "empCode is required",
+      });
+    }
+
+    const deptName = await poService.getDeptByEmpCode(empCode);
+
+    res.json({
+      success: true,
+      deptName: deptName || "",
+    });
+  } catch (err) {
+    console.error("부서 조회 실패:", err);
+    res.status(500).json({
+      success: false,
+      message: "부서 조회 중 오류 발생",
+    });
+  }
+});
+
+//자재 구매 요청 저장
+router.post("/mpr", async (req, res) => {
+  try {
+    const result = await poService.saveMpr(req.body); // { header, items }
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error("saveMpr error:", err);
+    res.status(500).json({
+      success: false,
+      message: "자재 구매 요청 저장 실패",
+    });
+  }
+});
+
+// 자재 구매요청서 목록 조회
+router.get("/mpr/list", async (req, res) => {
+  try {
+    const { mprCode } = req.query;
+    const rows = await poService.getMprList(mprCode);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: "자재 구매요청서 목록 조회 실패",
+    });
+  }
+});
+
+// 자재 구매요청서 단건 조회
+router.get("/mpr/:mprCode", async (req, res) => {
+  try {
+    const { mprCode } = req.params;
+    const data = await poService.getMprByCode(mprCode);
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: "해당 요청서를 찾을 수 없습니다.",
+      });
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: "자재 구매요청서 조회 실패",
+    });
+  }
+});
+
+//공급업체 목록
+router.get("/client", async (req, res) => {
+  try {
+    const keyword = req.query.keyword || "";
+
+    const data = await poService.getClientList(keyword);
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error(" 공급업체 조회 오류:", err);
+    res.status(500).json({ success: false, message: "공급업체 조회 실패" });
+  }
+});
+
+// 발주 단건 조회
+router.get("/:purchaseCode", async (req, res, next) => {
+  try {
+    const { purchaseCode } = req.params;
+    const data = await poService.getPoByCode(purchaseCode);
+
+    if (!data) {
+      return res.status(404).json({
+        code: "E404",
+        message: "해당 발주서를 찾을 수 없습니다.",
+      });
+    }
+
+    res.json({
+      code: "S200",
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 module.exports = router;

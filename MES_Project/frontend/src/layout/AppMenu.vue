@@ -80,8 +80,12 @@ const model = ref([
                 to: '',
                 items: [
                     {
-                        label: '자재 재고',
-                        to: ''
+                        label: '자재 구매 요청',
+                        to: '/purchaseReq'
+                    },
+                    {
+                        label: '자재 구매 요청 목록',
+                        to: '/purchaseReqList'
                     },
                     {
                         label: '발주서 관리',
