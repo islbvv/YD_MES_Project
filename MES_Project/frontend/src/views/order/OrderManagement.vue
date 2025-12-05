@@ -9,12 +9,25 @@ const showOrderModal = ref(false);
 // 모달 검색 결과
 const orderSearchList = ref([]);
 
+// 날짜 포맷 함수: 2025-06-23T15:00:00.000Z → 2025.06.23
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}.${m}.${day}`;
+}
+
 // 모달 검색 이벤트
 const fetchOrderSearch = async (keyword = '') => {
     try {
         const res = await axios.get('/api/order/search', { params: { keyword } });
         if (res.data && res.data.code === 'S200') {
-            const fullList = res.data.data || [];
+            const fullList = (res.data.data || []).map((row) => ({
+                ...row,
+                ord_date: formatDate(row.ord_date) // ← 여기서 포맷 변경!
+            }));
 
             if (keyword && fullList.length) {
                 orderSearchList.value = fullList.filter((row) => row.ord_code?.includes(keyword) || row.ord_name?.includes(keyword) || row.client_name?.includes(keyword));
@@ -28,8 +41,8 @@ const fetchOrderSearch = async (keyword = '') => {
 };
 
 // 모달에서 선택한 결과 받기
-const onOrderSelect = (row) => {
-    if (!row) return;
+const onOrderSelect = async (row) => {
+    if (!row || !row.ord_code) return;
 
     // 주문 기본 정보
     order.ord_code = row.ord_code || '';
@@ -40,22 +53,43 @@ const onOrderSelect = (row) => {
     order.readonly = true;
 
     // 제품 정보
-    const selectedOrderProducts = orderSearchList.value.filter((p) => p.ord_code === row.ord_code);
-    products.value = selectedOrderProducts.map((p) => ({
-        id: nextProductId++,
-        prod_name: p.prod_name || '',
-        type: p.com_value_name || '',
-        spec: p.spec_name || '',
-        unit: p.unit_name || '',
-        amount: p.ord_amount || 0,
-        unit_price: p.prod_price || 0,
-        delivery_date: p.delivery_date ? p.delivery_date.slice(0, 10) : '',
-        priority: p.ord_priority || '',
-        _selected: false,
-        get total() {
-            return (Number(this.amount) || 0) * (Number(this.unit_price) || 0);
+    try {
+        const res = await axios.get('/api/order/production', { params: { ord_code: row.ord_code } });
+
+        if (res.data && res.data.code === 'S200') {
+            const selectedOrderProducts = res.data.data || [];
+            let nextId = 1; // 제품 ID 초기화
+
+            products.value = selectedOrderProducts.map((p) => ({
+                id: nextId++,
+                prod_name: p.prod_name || '',
+                type: p.com_value_name || '',
+                spec: p.spec_name || '',
+                unit: p.unit_name || '',
+                amount: p.ord_amount || 0,
+                unit_price: p.prod_price || 0,
+                delivery_date: p.delivery_date ? p.delivery_date.slice(0, 10) : '',
+                priority: p.ord_priority || '',
+                _selected: false,
+                get total() {
+                    return (Number(this.amount) || 0) * (Number(this.unit_price) || 0);
+                }
+            }));
+
+            // 제품이 없는 경우 빈 행 추가
+            if (products.value.length === 0) {
+                products.value.push(createEmptyProduct(nextId));
+            }
+        } else {
+            // API 호출은 성공했으나 데이터가 없는 경우 (예: 주문은 있으나 제품 정보가 없을 때)
+            products.value = [createEmptyProduct(nextProductId++)];
+            console.warn('주문 제품 정보가 없습니다.', row.ord_code);
         }
-    }));
+    } catch (e) {
+        console.error('fetchOrderProduction failed', e);
+        alert('주문 제품 정보를 불러오는데 실패했습니다.');
+        products.value = [createEmptyProduct(nextProductId++)]; // 에러 시 빈 행으로 초기화
+    }
 };
 
 // 주문 기본 정보
@@ -226,8 +260,8 @@ function formatCurrency(v) {
                     <label>거래처</label>
                     <select v-model="order.client_name">
                         <option value="">거래처를 선택해주세요.</option>
-                        <option v-for="c in clientList" :key="c.client_code" :value="c.client_name">
-                            {{ c.client_name }}
+                        <option v-for="c in clientList" :key="c.clientCode" :value="c.clientName">
+                            {{ c.clientName }}
                         </option>
                     </select>
                 </div>
@@ -323,11 +357,9 @@ function formatCurrency(v) {
             searchPlaceholder="주문번호 또는 주문명 또는 거래처를 입력해주세요."
             :columns="[
                 { field: 'ord_code', label: '주문번호' },
-                { field: 'ord_date', label: '주문일자' },
                 { field: 'ord_name', label: '주문명' },
-                { field: 'client_name', label: '거래처' },
-                { field: 'delivery_date', label: '납기일' },
-                { field: 'ord_priority', label: '우선순위' }
+                { field: 'ord_date', label: '주문일자' },
+                { field: 'client_name', label: '거래처' }
             ]"
             :rows="orderSearchList"
             rowKey="ord_code"
