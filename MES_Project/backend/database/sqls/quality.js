@@ -44,6 +44,22 @@ JOIN mat_tbl mat
 ON mat.mat_code = mpr_d.mat_code
 WHERE mpr_d_code NOT IN (SELECT mpr_d_code FROM qio_tbl where mpr_d_code IS Not Null);
 `,
+  findQualityEmployeeList: `
+  SELECT emp.emp_code
+  , cc.note
+  , emp.emp_name
+  , emp.hdate
+  , emp.ledate
+  , emp.regdate
+  , emp.auth
+  , emp.reg
+  , emp.emp_stat
+  , emp.emp_job_id
+FROM emp_tbl emp
+JOIN common_code cc
+ON cc.com_value = emp.emp_job_id -- emp_job_id // m1 = 관리자, m2 사원
+WHERE emp.dept_code = 'DEPT-5'
+`,
   findAllQIO: `
   SELECT *
   FROM qio_tbl

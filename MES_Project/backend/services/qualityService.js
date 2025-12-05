@@ -91,6 +91,16 @@ exports.getMpr_dList = async () => {
   }
 };
 
+// 3. 품질팀 사원 전체 조회.
+exports.getQualityEmployeeList = async () => {
+  try {
+    const result = await query("findQualityEmployeeList", []);
+    return result;
+  } catch (err) {
+    throw err;
+  }
+};
+
 // ?. 기존의 품질검사 지시 목록을 조회.
 exports.getQIOList = async () => {
   try {
