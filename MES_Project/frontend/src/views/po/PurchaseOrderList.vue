@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import SearchSelectModal from '@/components/common/SearchSelectModal.vue';
 
 const showClientModal = ref(false);
+const showPOModal = ref(false);
 
 const filters = ref({
     orderNo: '',
@@ -20,11 +21,15 @@ const filters = ref({
 });
 
 const typeOptions = {
-    i1: '완제품',
-    i2: '반제품',
-    i3: '부자재',
-    i4: '원자재'
+    t1: '원자재',
+    t2: '부자재'
 };
+//발주서 모달 컬럼
+const orderColumns = [
+    { field: 'purchaseCode', label: '발주서 번호' },
+    { field: 'purchaseDate', label: '발주제안일' },
+    { field: 'matName', label: '자재명' }
+];
 
 // 클라이언트 불러오기 모달 컬럼
 const clientColumns = [
@@ -38,10 +43,17 @@ const clientTypeOptions = {
     l2: '공급업체'
 };
 
+const statusOptions = {
+    c1: '요청완료',
+    c2: '입고완료'
+};
+
 // 전체 발주 목록
 const allList = ref([]);
 // 공급업체 모달 데이터
 const clientRows = ref([]);
+//발주서 모달 데이터
+const orderRows = ref([]);
 
 // 실제 테이블에 보여줄 데이터
 const tableRows = ref([...allList.value]);
@@ -60,7 +72,7 @@ const fetchClientList = async () => {
     }));
 };
 
-//발주목록 불러오기
+//발주목록 불러오기 메인
 const fetchOrderList = async (keyword = '') => {
     const res = await axios.get('/api/poder/list', {
         params: {
@@ -76,6 +88,24 @@ const fetchOrderList = async (keyword = '') => {
         deadLine: row.deadLine ? String(row.deadLine).slice(0, 10) : '',
         regDate: row.regDate ? String(row.regDate).slice(0, 10) : ''
     }));
+    tableRows.value = [...allList.value];
+    allChecked.value = false;
+};
+//발주서 불러오기 모달!
+const fetchOrderSelectList = async (keyword = '') => {
+    const res = await axios.get('/api/poder', {
+        params: {
+            purchaseCode: keyword || null
+        }
+    });
+
+    const rows = res.data.data || [];
+
+    orderRows.value = rows.map((row) => ({
+        purchaseCode: row.purchaseCode,
+        purchaseDate: row.purchaseDate ? String(row.purchaseDate).slice(0, 10) : '',
+        matName: row.matName || ''
+    }));
 };
 
 // 필터 적용 함수 / 조회 눌러 적용
@@ -83,7 +113,7 @@ function applyFilter() {
     const f = filters.value;
 
     tableRows.value = allList.value.filter((row) => {
-        if (f.orderNo && !row.purchaseCode.includes(f.orderNo)) return false;
+        if (f.orderNo && row.purchaseCode !== f.orderNo) return false;
 
         if (f.materialType && row.type !== f.materialType) return false;
 
@@ -147,6 +177,10 @@ function getTypeLabel(code) {
     return typeOptions[code] || code;
 }
 
+function getStatusLabel(code) {
+    return statusOptions[code] || code;
+}
+
 function downloadExcel() {
     // 체크된 행만
     const selected = tableRows.value.filter((row) => row.checked);
@@ -185,6 +219,12 @@ const openClientModal = async () => {
     showClientModal.value = true;
 };
 
+//발주서 모달 열기
+const openOrderSelectModal = async () => {
+    await fetchOrderSelectList();
+    showPOModal.value = true;
+};
+
 // 공급업체 모달 검색
 const handleClientSearch = async (keyword) => {
     await fetchClientList(keyword);
@@ -206,6 +246,27 @@ const handleConfirmClient = (row) => {
 const handleCancelClient = () => {
     showClientModal.value = false;
 };
+//발주 모달 닫기
+const handleCancelOrderSelect = () => {
+    showPOModal.value = false;
+};
+
+// 발주 모달에서 검색
+const handleOrderSearch = async (keyword) => {
+    await fetchOrderSelectList(keyword);
+};
+
+//발주서 모달 선택
+const handleConfirmOrderSelect = (row) => {
+    if (!row || !row.purchaseCode) {
+        alert('발주서를 선택해 주세요.');
+        return;
+    }
+
+    filters.value.orderNo = row.purchaseCode;
+
+    showPOModal.value = false;
+};
 
 // 초기 데이터 로드
 fetchOrderList().then(() => {
@@ -222,17 +283,15 @@ fetchOrderList().then(() => {
                 <!-- 1행 -->
                 <div class="form-item">
                     <label>발주서번호</label>
-                    <input class="input" v-model="filters.orderNo" />
+                    <input class="input" v-model="filters.orderNo" readonly placeholder="발주서 선택" @click="openOrderSelectModal" />
                 </div>
 
                 <div class="form-item">
                     <label>자재유형</label>
                     <select class="input" v-model="filters.materialType">
                         <option value="">전체</option>
-                        <option value="i1">완제품</option>
-                        <option value="i2">반제품</option>
-                        <option value="i3">부자재</option>
-                        <option value="i4">원자재</option>
+                        <option value="t1">원자재</option>
+                        <option value="t2">부자재</option>
                     </select>
                 </div>
 
@@ -274,8 +333,8 @@ fetchOrderList().then(() => {
                     <label>발주상태</label>
                     <select class="input" v-model="filters.status">
                         <option value="">전체</option>
-                        <option value="요청완료">요청완료</option>
-                        <option value="입고완료">입고완료</option>
+                        <option value="c1">요청완료</option>
+                        <option value="c2">입고완료</option>
                     </select>
                 </div>
 
@@ -297,50 +356,51 @@ fetchOrderList().then(() => {
                 </div>
                 <button class="btn-excel" @click="downloadExcel">엑셀 다운로드</button>
             </div>
+            <div class="table-scroll">
+                <table class="nice-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px">
+                                <input type="checkbox" v-model="allChecked" @change="toggleAll" />
+                            </th>
+                            <th>발주서번호</th>
+                            <th>발주제안일</th>
+                            <th>자재유형</th>
+                            <th>자재명</th>
+                            <th>공급업체</th>
+                            <th>필요수량</th>
+                            <th>입고납기일</th>
+                            <th>발주상태</th>
+                            <th>작성자</th>
+                            <th>등록일자</th>
+                        </tr>
+                    </thead>
 
-            <table class="nice-table">
-                <thead>
-                    <tr>
-                        <th style="width: 40px">
-                            <input type="checkbox" v-model="allChecked" @change="toggleAll" />
-                        </th>
-                        <th>발주서번호</th>
-                        <th>발주제안일</th>
-                        <th>자재유형</th>
-                        <th>자재명</th>
-                        <th>공급업체</th>
-                        <th>필요수량</th>
-                        <th>입고납기일</th>
-                        <th>발주상태</th>
-                        <th>작성자</th>
-                        <th>등록일자</th>
-                    </tr>
-                </thead>
+                    <tbody>
+                        <tr v-for="row in tableRows" :key="row.id">
+                            <td>
+                                <input type="checkbox" v-model="row.checked" />
+                            </td>
+                            <td>{{ row.purchaseCode }}</td>
+                            <td>{{ row.purchaseDate }}</td>
+                            <td>{{ getTypeLabel(row.type) }}</td>
+                            <td>{{ row.matName }}</td>
+                            <td>{{ row.clientName }}</td>
+                            <td class="text-right">
+                                {{ formatNumber(row.req_qtt) }}
+                            </td>
+                            <td>{{ row.deadLine }}</td>
+                            <td>{{ getStatusLabel(row.stat) }}</td>
+                            <td>{{ row.mcode }}</td>
+                            <td>{{ row.regDate }}</td>
+                        </tr>
 
-                <tbody>
-                    <tr v-for="row in tableRows" :key="row.id">
-                        <td>
-                            <input type="checkbox" v-model="row.checked" />
-                        </td>
-                        <td>{{ row.purchaseCode }}</td>
-                        <td>{{ row.purchaseDate }}</td>
-                        <td>{{ getTypeLabel(row.type) }}</td>
-                        <td>{{ row.matName }}</td>
-                        <td>{{ row.clientName }}</td>
-                        <td class="text-right">
-                            {{ formatNumber(row.req_qtt) }}
-                        </td>
-                        <td>{{ row.deadLine }}</td>
-                        <td>{{ row.stat }}</td>
-                        <td>{{ row.mcode }}</td>
-                        <td>{{ row.regDate }}</td>
-                    </tr>
-
-                    <tr v-if="!tableRows.length">
-                        <td colspan="11" class="empty-cell">조회 결과가 없습니다.</td>
-                    </tr>
-                </tbody>
-            </table>
+                        <tr v-if="!tableRows.length">
+                            <td colspan="11" class="empty-cell">조회 결과가 없습니다.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </section>
 
@@ -353,6 +413,17 @@ fetchOrderList().then(() => {
         @search="handleClientSearch"
         @confirm="handleConfirmClient"
         @cancel="handleCancelClient"
+    />
+
+    <SearchSelectModal
+        v-model="showPOModal"
+        :columns="orderColumns"
+        :rows="orderRows"
+        row-key="purchaseCode"
+        search-placeholder="발주서번호를 입력해주세요."
+        @confirm="handleConfirmOrderSelect"
+        @cancel="handleCancelOrderSelect"
+        @search="handleOrderSearch"
     />
 </template>
 
@@ -482,8 +553,8 @@ fetchOrderList().then(() => {
 /* 테이블 */
 .nice-table {
     width: 100%;
-    border-collapse: collapse;
-    border-top: 2px solid #f4b321;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .nice-table th,
@@ -506,5 +577,21 @@ fetchOrderList().then(() => {
     text-align: center;
     color: #888;
     padding: 20px 0;
+}
+
+.table-scroll {
+    max-height: 360px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-radius: 6px;
+}
+
+.table-scroll thead th {
+    position: sticky;
+    top: 0;
+    background: #faf7e8;
+    z-index: 2;
+    border-top: 2px solid #f4b321;
+    box-shadow: 0 2px 0 #eee;
 }
 </style>
