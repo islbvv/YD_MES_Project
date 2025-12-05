@@ -12,7 +12,8 @@ export const useQualityStore = defineStore('quality', {
         qioList: [],
         qirList: [],
         prdrList: [], // prdr_tbl: 생산실적 테이블
-        mpr_dList: [], // mpr_d_tbl: -- 발주서 ?사본 테이블
+        mpr_dList: [], // mpr_d_tbl: -- 자재구매요청상세 테이블: 기존사람들이 이걸로만들어서 나도 이걸로해야됨 월요일수정가능성 있음.
+        qualityEmployeeList: [], // 품질팀 사원 목록
 
         // 사용자가 선택한 항목
         selectedPrdr: null,
@@ -26,7 +27,9 @@ export const useQualityStore = defineStore('quality', {
     // 2. getters: state를 기반으로 계산된 값을 반환합니다. (예: computed)
     getters: {
         hasQCRData: (state) => state.qcrList.length > 0,
-        hasPrdrData: (state) => state.prdrList.length > 0
+        hasPrdrData: (state) => state.prdrList.length > 0,
+        hasEmployeeManager: (state) => state.qualityEmployeeList.length > 0,
+        getEmployeeManagers: (state) => state.qualityEmployeeList.filter((item) => item.emp_job_id === 'm1')
     },
     // 3. actions: 상태를 변경하는 동기/비동기 메서드를 정의합니다.
     actions: {
@@ -82,6 +85,20 @@ export const useQualityStore = defineStore('quality', {
             } catch (error) {
                 this.error = '데이터를 불러오는 데 실패했습니다.';
                 console.error('Error fetching Mpr_d list:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+        async fetchQualityEmployeeList() {
+            this.loading = true;
+            this.error = null;
+            try {
+                const response = await axios.get('/api/quality/es');
+                console.log(response.data.data);
+                this.qualityEmployeeList = response.data.data; // 여기는 정상입니다.
+            } catch (error) {
+                this.error = '데이터를 불러오는 데 실패했습니다.';
+                console.error('Error fetching QualityEmployee list:', error);
             } finally {
                 this.loading = false;
             }
