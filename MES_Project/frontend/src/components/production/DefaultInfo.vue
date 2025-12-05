@@ -43,22 +43,20 @@ const formattedPlanDate = computed(() => {
     const dd = String(date.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
 });
+const emit = defineEmits(['updateOtherData']);
 
-// PlanModal 선택 처리
 const handlePlanSelected = (payload) => {
     if (!payload) return;
 
-    // 3가지 선택값
     const selectedData = payload.selectedData;
     formData.value.productionPlanNo = selectedData.prdp_code;
     formData.value.workOrderNo = selectedData.wko_code;
     formData.value.planDate = selectedData.prdp_date;
 
-    // 나머지 값 잠시 저장
     otherDataStore.value = payload.otherData;
 
-    // 화면에는 표시하지 않고 필요시 emit로 최상위 부모 전달 가능
-    console.log('잠시 저장한 otherData:', otherDataStore.value);
+    // 부모에게 전달
+    emit('updateOtherData', otherDataStore.value);
 
     showPlanModal.value = false;
 };
