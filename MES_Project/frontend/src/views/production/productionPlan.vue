@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-<script setup></script>
-<template>
-    <h3></h3>
-</template>
-=======
 <script setup>
 import { ref, computed } from 'vue';
 // 1. 분리된 컴포넌트 임포트 (경로는 실제 파일 구조에 맞게 수정 필요)
@@ -134,4 +128,3 @@ const filteredRows = computed(() => {
     }
 }
 </style>
->>>>>>> f36b128028ecfe0e943366eef349a80f15349509
