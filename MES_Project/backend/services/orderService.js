@@ -262,9 +262,9 @@ exports.saveOrder = async (payload) => {
       const existingDetailCodes = existingDetails.map((d) => d.ord_d_code);
 
       // ii) 프론트에서 넘어온 상세 ID 목록 (ord_d_code가 있는 항목)
-      const + = products
-        .map((p) => p.ord_d_code)
-        .filter((c) => c);
+      // const + = products
+      //   .map((p) => p.ord_d_code)
+      //   .filter((c) => c);
 
       // iii) 🗑️ 삭제할 목록 식별: DB에는 있지만, 넘어오지 않은 ID
       const codesToDelete = existingDetailCodes.filter(

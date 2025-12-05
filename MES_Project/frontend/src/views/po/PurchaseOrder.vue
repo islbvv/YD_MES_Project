@@ -36,10 +36,8 @@ const ReqColumns = [
 ];
 
 const typeOptions = {
-    i1: '완제품',
-    i2: '반제품',
-    i3: '부자재',
-    i4: '원자재'
+    t1: '원자재',
+    t2: '부자재'
 };
 
 const unitOptions = {
@@ -53,6 +51,11 @@ const unitOptions = {
     h8: '%',
     h9: 'cm',
     ha: 'N'
+};
+
+const statusOptions = {
+    c1: '요청완료',
+    c2: '입고완료'
 };
 
 const orderRows = ref([]);
@@ -89,7 +92,7 @@ const fetchMateList = async (keyword = '') => {
 const fetchReqList = async (keyword = '') => {
     const res = await axios.get('/api/poder/mpr/list', {
         params: {
-            mprCode: keyword || null // 검색어(요청서 번호) 있으면 전달
+            mprCode: keyword || null
         }
     });
 
@@ -133,7 +136,8 @@ const purchaseDate = ref(getToday()); // purchase_req_date
 // 헤더 필드
 const writerCode = ref('EMP-10003');
 const note = ref('');
-const status = ref('요청완료');
+const status = ref('c1');
+const reqNo = ref(''); // 자재구매요청서번호
 
 // 자재 리스트
 const materials = ref([createRow(), createRow(), createRow()]);
@@ -154,7 +158,8 @@ function createRow() {
         lackQty: '',
         leadtime: '',
         dueDate: '',
-        vendor: ''
+        vendor: '',
+        vendorCode: ''
     };
 }
 
@@ -180,6 +185,10 @@ function getTypeLabel(code) {
 function getUnitLabel(code) {
     return unitOptions[code] || code;
 }
+
+function getStatusLabel(code) {
+    return statusOptions[code] || code;
+}
 //발주서 저장
 const savePo = async () => {
     const today = getToday();
@@ -190,7 +199,8 @@ const savePo = async () => {
         stat: status.value,
         regdate: orderDate.value || today, // 시스템 등록일
         note: note.value,
-        mcode: writerCode.value
+        mcode: writerCode.value,
+        mpr_code: reqNo.value || null
     };
 
     const items = materials.value
@@ -199,6 +209,7 @@ const savePo = async () => {
             needQty: row.needQty,
             dueDate: row.dueDate,
             vendor: row.vendor,
+            vendorCode: row.vendorCode,
             code: row.code
         }))
         .filter((item) => {
@@ -236,9 +247,10 @@ const deletePo = async () => {
         purchaseCode.value = '';
         purchaseDate.value = getToday();
         orderDate.value = getToday();
-        status.value = '요청완료';
+        status.value = 'c1';
         note.value = '';
         writerCode.value = 'EMP-10003';
+        reqNo.value = '';
         materials.value = [createRow(), createRow(), createRow()];
         allChecked.value = false;
     } catch (err) {
@@ -254,9 +266,10 @@ const resetForm = () => {
     purchaseCode.value = '';
     purchaseDate.value = getToday();
     orderDate.value = getToday();
-    status.value = '요청완료';
+    status.value = 'c1';
     note.value = '';
     writerCode.value = 'EMP-10003';
+    reqNo.value = '';
 
     // 자재 테이블 초기화
     materials.value = [createRow(), createRow(), createRow()];
@@ -283,9 +296,10 @@ const handleConfirmOrder = async (selectedRow) => {
 
         orderDate.value = data.header.regdate ? String(data.header.regdate).slice(0, 10) : getToday();
 
-        status.value = data.header.stat || '요청완료';
+        status.value = data.header.stat || 'c1';
         note.value = data.header.note || '';
         writerCode.value = data.header.mcode || 'EMP-10003';
+        reqNo.value = data.header.mpr_code || '';
 
         // 3) 상세(자재 목록) 매핑
         const items = data.items || [];
@@ -345,6 +359,7 @@ const handleConfirmMate = (selectedRow) => {
     if (selectedRow.curInven !== undefined) row.stock = selectedRow.curInven;
     if (selectedRow.insInven !== undefined) row.lackQty = selectedRow.insInven;
     if (selectedRow.clientName) row.vendor = selectedRow.clientName;
+    row.vendorCode = selectedRow.clientCode || '';
 
     showMateModal.value = false;
     activeMateRow.value = null;
@@ -366,6 +381,8 @@ const handleConfirmReq = async (selectedRow) => {
     try {
         const res = await axios.get(`/api/poder/mpr/${selectedRow.mprCode}`);
         const data = res.data.data;
+
+        reqNo.value = selectedRow.mprCode;
 
         const items = data.items || [];
 
@@ -454,12 +471,12 @@ const handleReqSearch = async (keyword) => {
 
                 <div class="form-item">
                     <label>발주상태</label>
-                    <input type="text" class="input" disabled v-model="status" />
+                    <input type="text" class="input" :value="getStatusLabel(status)" disabled />
                 </div>
 
                 <div class="form-item">
                     <label>자재구매요청서번호</label>
-                    <input type="text" class="input" disabled />
+                    <input type="text" class="input" disabled v-model="reqNo" />
                 </div>
 
                 <div class="form-item">
@@ -527,7 +544,7 @@ const handleReqSearch = async (keyword) => {
         </div>
     </section>
     <SearchSelectModal v-model="showPOModal" :columns="orderColumns" :rows="orderRows" row-key="purchaseCode" search-placeholder="발주서번호를 입력해주세요." @confirm="handleConfirmOrder" @cancel="handleCancelOrder" @search="handleOrderSearch" />
-    <SearchSelectModal v-model="showMateModal" :columns="mateColumns" :rows="mateRows" row-key="matCode" search-placeholder="자재명을 입력해주세요." @confirm="handleConfirmMate" @cancel="handleCancelMate" @search="handleMateSearch" />
+    <SearchSelectModal v-model="showMateModal" :columns="mateColumns" :rows="mateRows" row-key="matCode" search-placeholder="자재명 또는 자재코드를 입력해주세요." @confirm="handleConfirmMate" @cancel="handleCancelMate" @search="handleMateSearch" />
     <SearchSelectModal v-model="showReqModal" :columns="ReqColumns" :rows="reqRows" row-key="mprCode" search-placeholder="자재구매요청번호를 입력해주세요." @confirm="handleConfirmReq" @cancel="handleCancelReq" @search="handleReqSearch" />
 </template>
 
