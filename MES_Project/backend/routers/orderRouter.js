@@ -93,11 +93,32 @@ router.get("/manager/list", async (req, res, next) => {
 });
 
 // DELETE /order/:ord_code - 주문 삭제
-router.delete("/order/:ord_code", async (req, res, next) => {
+router.delete("/:ord_code", async (req, res, next) => {
   try {
-    const deletedOrder = await orderService.removeOrder(req.params.ord_code);
+    const ord_code = req.params.ord_code;
+
+    if (!ord_code) {
+      return res.status(400).json({
+        code: "E400",
+        message: "ord_code가 필요합니다.",
+      });
+    }
+
+    const deletedOrder = await orderService.removeOrder(ord_code);
 
     res.json({ code: "S200", data: deletedOrder });
+  } catch (err) {
+    next(err); // 에러를 전역 오류 처리 미들웨어로 전달
+  }
+});
+
+// POST /order - 주문 저장/수정
+router.post("/", async (req, res, next) => {
+  try {
+    const payload = req.body;
+    const result = await orderService.saveOrder(payload);
+
+    res.json({ code: "S200", data: result });
   } catch (err) {
     next(err); // 에러를 전역 오류 처리 미들웨어로 전달
   }

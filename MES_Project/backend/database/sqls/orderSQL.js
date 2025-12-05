@@ -69,6 +69,7 @@ module.exports = {
         ,od.prod_price -- 단가
         ,od.delivery_date -- 납기일
         ,od.ord_priority -- 우선순위
+        ,od.total_price -- 총액
   FROM ord_tbl o
   JOIN ord_d_tbl od ON o.ord_code = od.ord_code
   JOIN prod_tbl p ON p.prod_code = od.prod_code

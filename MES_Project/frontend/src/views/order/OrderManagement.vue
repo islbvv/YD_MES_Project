@@ -9,7 +9,7 @@ const showOrderModal = ref(false);
 // 모달 검색 결과
 const orderSearchList = ref([]);
 
-// 날짜 포맷 함수: 2025-06-23T15:00:00.000Z → 2025.06.23
+// 날짜 포맷 함수 0000.00.00
 function formatDate(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
@@ -40,6 +40,22 @@ const fetchOrderSearch = async (keyword = '') => {
     }
 };
 
+// 주문 기본 정보
+const order = reactive({
+    ord_code: '',
+    ord_name: '',
+    ord_date: new Date().toISOString().slice(0, 10),
+    client_name: '',
+    client_code: '',
+    client_contact: '',
+    mcode: '',
+    note: '',
+    readonly: false
+});
+
+const clientList = ref([]);
+const managerList = ref([]);
+
 // 모달에서 선택한 결과 받기
 const onOrderSelect = async (row) => {
     if (!row || !row.ord_code) return;
@@ -51,6 +67,12 @@ const onOrderSelect = async (row) => {
     order.client_contact = row.emp_name || '';
     order.note = row.note || '';
     order.readonly = true;
+
+    // 거래처 코드 (client_code)와 담당자 코드 (mcode)를 찾아서 저장
+    const selectedClient = clientList.value.find((c) => c.clientName === row.client_name);
+    const selectedManager = managerList.value.find((m) => m.emp_name === row.emp_name);
+    order.client_code = selectedClient?.client_code || '';
+    order.mcode = selectedManager?.emp_code || '';
 
     // 제품 정보
     try {
@@ -70,6 +92,9 @@ const onOrderSelect = async (row) => {
                 unit_price: p.prod_price || 0,
                 delivery_date: p.delivery_date ? p.delivery_date.slice(0, 10) : '',
                 priority: p.ord_priority || '',
+                total_price: p.total_price || 0,
+                prod_code: p.prod_code || '', // 제품 저장을 위해 필요
+                ord_d_code: p.ord_d_code || '', // 상세 수정을 위해 필요
                 _selected: false,
                 get total() {
                     return (Number(this.amount) || 0) * (Number(this.unit_price) || 0);
@@ -92,20 +117,6 @@ const onOrderSelect = async (row) => {
     }
 };
 
-// 주문 기본 정보
-const order = reactive({
-    ord_code: '',
-    ord_name: '',
-    ord_date: new Date().toISOString().slice(0, 10),
-    client_name: '',
-    client_contact: '',
-    note: '',
-    readonly: false
-});
-
-const clientList = ref([]);
-const managerList = ref([]);
-
 // 제품 목록: 기본 4행
 const products = ref([createEmptyProduct(1), createEmptyProduct(2), createEmptyProduct(3), createEmptyProduct(4)]);
 let nextProductId = 5;
@@ -121,6 +132,9 @@ function createEmptyProduct(id) {
         unit_price: 0,
         delivery_date: '',
         priority: '',
+        total_price: 0,
+        prod_code: '', // 제품 코드
+        ord_d_code: '', // 주문 상세 코드
         _selected: false,
         get total() {
             return (Number(this.amount) || 0) * (Number(this.unit_price) || 0);
@@ -187,42 +201,125 @@ function resetForm() {
     order.ord_code = '';
     order.ord_name = '';
     order.client_name = '';
+    order.client_code = '';
     order.client_contact = '';
+    order.mcode = '';
     order.note = '';
     order.readonly = false;
     products.value = [createEmptyProduct(nextProductId++), createEmptyProduct(nextProductId++), createEmptyProduct(nextProductId++), createEmptyProduct(nextProductId++)];
 }
 
 function saveOrder() {
+    // 1. 필수 코드 값 찾기 및 설정
+    const selectedClient = clientList.value.find((c) => c.clientName === order.client_name);
+    const selectedManager = managerList.value.find((m) => m.emp_name === order.client_contact);
+
+    // 주문에 필요한 코드값 설정
+    order.client_code = selectedClient?.client_code || '';
+    order.mcode = selectedManager?.emp_code || '';
+
+    // 백엔드 필수 값 검증 (프론트에서도 1차 검증)
+    if (!order.ord_name || !order.ord_date || !order.mcode || !order.client_code) {
+        alert('❌ 주문명, 주문일자, 거래처, 거래처담당자는 필수 입력 항목입니다.');
+        return;
+    }
+
+    // 2. 백엔드 saveOrder가 단일 orderDetail 객체를 기대하므로, 첫 번째 제품만 추출 (임시 처리)
+    // 실제로는 백엔드 로직이 다수 제품을 처리하도록 수정되거나, 프론트에서 반복 호출이 필요할 수 있습니다.
+    const firstProduct = products.value[0];
+
+    // 제품 필수 값 검증 (첫 번째 제품만)
+    if (!firstProduct.prod_code || !firstProduct.amount || !firstProduct.unit_price || !firstProduct.delivery_date) {
+        alert('❌ 첫 번째 제품의 제품명(코드), 수량, 단가, 납기일은 필수 입력 항목입니다.');
+        return;
+    }
+
+    // total_price 계산
+    firstProduct.total_price = firstProduct.total;
+
+    // 3. 백엔드 페이로드 구조에 맞게 조정: { order: {}, orderDetail: {} }
     const payload = {
-        order: { ...order },
-        products: products.value.map((p) => ({
-            prod_name: p.prod_name,
-            type: p.type,
-            amount: p.amount,
-            unit_price: p.unit_price,
-            delivery_date: p.delivery_date,
-            priority: p.priority
-        }))
+        order: {
+            // 주문 상태(ord_stat)는 백엔드에서 기본값 'a1' (주문전달)로 처리되거나,
+            // 폼에 필드가 있다면 그 값을 사용해야 합니다. 폼에 필드가 없으므로 'a1'을 임시로 설정합니다.
+            ord_code: order.ord_code,
+            ord_name: order.ord_name,
+            ord_date: order.ord_date,
+            ord_stat: 'a1', // 임시 기본 상태값 (주문전달)
+            note: order.note,
+            mcode: order.mcode,
+            client_code: order.client_code
+        },
+        orderDetail: {
+            ord_d_code: firstProduct.ord_d_code, // 수정 시 필요
+            unit: firstProduct.unit,
+            spec: firstProduct.spec,
+            ord_amount: firstProduct.amount,
+            prod_price: firstProduct.unit_price,
+            delivery_date: firstProduct.delivery_date,
+            ord_priority: firstProduct.priority || 0, // 기본값 0
+            total_price: firstProduct.total_price,
+            prod_code: firstProduct.prod_code
+        }
     };
+
     console.log('저장 payload', payload);
-    // axios.post('/api/order/save', payload) ...
-    alert('저장 동작(샘플): 콘솔 확인');
+
+    // 4. Axios POST 요청 (라우터: POST /order)
+    axios
+        .post('/api/order', payload)
+        .then((res) => {
+            if (res.data && res.data.code === 'S200') {
+                alert('✅ 주문이 성공적으로 저장되었습니다!');
+
+                // 새로운 주문 등록 시, 백엔드에서 반환된 주문번호로 업데이트
+                if (!order.ord_code && res.data.data && res.data.data.ord_code) {
+                    order.ord_code = res.data.data.ord_code;
+                    order.readonly = true;
+                }
+            } else {
+                alert(`⚠️ 주문 저장에 실패했습니다: ${res.data.message || '알 수 없는 오류'}`);
+            }
+        })
+        .catch((e) => {
+            console.error('saveOrder failed', e);
+            alert('❌ 주문 저장 중 오류가 발생했습니다. 콘솔을 확인하세요.');
+        });
 }
 
+// ⭐⭐⭐ 주문 삭제 (라우터: DELETE /order/:ord_code) ⭐⭐⭐
 function deleteOrder() {
     if (!order.ord_code) {
         alert('삭제할 주문번호가 없습니다.');
         return;
     }
-    if (!confirm('정말 삭제하시겠습니까?')) return;
-    // axios.delete(`/api/order/${order.ord_code}`) ...
-    alert('삭제 동작(샘플)');
+    if (!confirm(`주문번호 ${order.ord_code}를 정말 삭제하시겠습니까?`)) return;
+
+    // 1. Axios DELETE 요청 (라우터: DELETE /order/:ord_code)
+    axios
+        .delete(`/api/order/${order.ord_code}`)
+        .then((res) => {
+            if (res.data && res.data.code === 'S200') {
+                alert(`✅ 주문번호 ${order.ord_code}가 삭제되었습니다.`);
+                // 삭제 후 폼 초기화
+                resetForm();
+            } else {
+                alert(`⚠️ 주문 삭제에 실패했습니다: ${res.data.message || '알 수 없는 오류'}`);
+            }
+        })
+        .catch((e) => {
+            console.error('deleteOrder failed', e);
+            alert('❌ 주문 삭제 중 오류가 발생했습니다. 콘솔을 확인하세요.');
+        });
 }
 
 function openProductSearch(idx) {
-    const name = prompt('검색 제품명을 입력하세요');
-    if (name) products.value[idx].prod_name = name;
+    const code = prompt('검색 제품 코드를 입력하세요. (임시)');
+    if (code) {
+        // 실제 제품 검색 후 코드, 이름, 규격, 단위 등을 채워야 함
+        products.value[idx].prod_code = code;
+        products.value[idx].prod_name = `제품-${code}`;
+    }
 }
 
 function formatCurrency(v) {
@@ -337,7 +434,7 @@ function formatCurrency(v) {
                                 <option v-for="n in 3" :key="n" :value="n - 1">{{ n - 1 }}</option>
                             </select>
                         </td>
-                        <td class="right">{{ formatCurrency(p.total) }}</td>
+                        <td class="left">{{ formatCurrency(p.total) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -511,8 +608,8 @@ function formatCurrency(v) {
 }
 
 /* 숫자·총액 정렬 */
-.product-table td.right {
-    text-align: right;
+.product-table td.left {
+    text-align: left;
 }
 
 /* 제품명 row 정렬 */

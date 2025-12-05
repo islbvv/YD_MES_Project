@@ -142,21 +142,11 @@ exports.removeOrder = async (ord_code) => {
   try {
     await conn.beginTransaction();
 
-    // 1. 주문 상세 정보 삭제
-    await query("deleteOrderDetail", ord_code);
-
-    // 2. 주문 정보 삭제
-    await query("deleteOrder", ord_code);
-
-    await conn.commit();
-
-    return { ord_code: ord_code };
+    const res = await query("deleteOrder", ord_code);
+    return res;
   } catch (err) {
-    await conn.rollback();
     console.error("[orderService.js || 주문 삭제 실패]", err.message);
     throw err;
-  } finally {
-    conn.release();
   }
 };
 
@@ -166,22 +156,11 @@ exports.saveOrder = async (payload) => {
   try {
     await conn.beginTransaction();
 
-    const { order, orderDetail } = payload;
+    const { order, products } = payload;
     let { ord_code, ord_name, ord_date, ord_stat, note, mcode, client_code } =
       order;
-    let {
-      ord_d_code,
-      unit,
-      spec,
-      ord_amount,
-      prod_price,
-      delivery_date,
-      ord_priority,
-      total_price,
-      prod_code,
-    } = orderDetail;
 
-    // 1. 주문 코드, 주문 상세 코드, 상태값 준비
+    // 1. 주문 코드 및 상태값 준비
     // 필수 값 검증
     if (!ord_name || !ord_date || !ord_stat || !mcode || !client_code) {
       throw new Error(
@@ -189,19 +168,6 @@ exports.saveOrder = async (payload) => {
       );
     }
     ord_stat = ord_stat || "a1"; // 상태값 (없으면 기본값 'a1': 주문전달 사용)
-
-    if (
-      !unit ||
-      !ord_amount ||
-      !prod_price ||
-      !delivery_date ||
-      !total_price ||
-      !prod_code
-    ) {
-      throw new Error(
-        "필수 정보(단위, 수량, 단가, 납기일, 총액, 상품 코드)가 누락되어 주문 상세 정보를 저장할 수 없습니다."
-      );
-    }
 
     let new_ord_code = ord_code;
 
@@ -230,7 +196,6 @@ exports.saveOrder = async (payload) => {
       )}`;
 
       // 최대 주문 상세 코드 조회 및 새 번호 생성
-      const new_ord_d_code = ord_d_code;
       const dRows = await conn.query("selectMaxOrderDetailCode");
       const dMaxCode = dRows[0]?.max_ord_d_code || null;
       let dNextCodeNum = 1;
@@ -272,12 +237,117 @@ exports.saveOrder = async (payload) => {
         prod_code,
       ];
       await conn.query("insertOrderDetail", orderDetailParams);
+    } else {
+      // 3. 수정 모드: UPDATE 및 상세 삭제 처리 (선택 삭제)
+      // 주문 기본 정보 수정 (updateOrder)
+      const orderParams = [
+        ord_name,
+        ord_date,
+        ord_stat,
+        note,
+        mcode,
+        client_code,
+        ord_code,
+      ];
+      await conn.query("updateOrder", orderParams);
+
+      // **주문 상세 선택 삭제 로직**
+      // 기존 상세 정보 ID 목록 조회 (DB에 현재 저장된 목록)
+      const realOrdCode = new_ord_code || ord_code;
+
+      const [existingDetails] = await conn.query(
+        "SELECT ord_d_code FROM ord_d_tbl WHERE ord_code = ?",
+        [realOrdCode]
+      );
+      const existingDetailCodes = existingDetails.map((d) => d.ord_d_code);
+
+      // ii) 프론트에서 넘어온 상세 ID 목록 (ord_d_code가 있는 항목)
+      // const + = products
+      //   .map((p) => p.ord_d_code)
+      //   .filter((c) => c);
+
+      // iii) 🗑️ 삭제할 목록 식별: DB에는 있지만, 넘어오지 않은 ID
+      const codesToDelete = existingDetailCodes.filter(
+        (code) => !incomingDetailCodes.includes(code)
+      );
+
+      // iv) 상세 정보 삭제 실행 (ord_d_code 기준으로 DELETE IN 쿼리 동적 생성)
+      if (codesToDelete.length > 0) {
+        const codesPlaceholder = codesToDelete.map(() => "?").join(",");
+        const deleteQuery = `DELETE FROM ord_d_tbl WHERE ord_d_code IN (${codesPlaceholder})`;
+
+        await conn.query(deleteQuery, codesToDelete);
+      }
+    }
+
+    // **************************************************
+    // 3. 주문 상세 정보 (제품 목록) 처리: 신규 등록 및 수정
+    // **************************************************
+
+    // 3-1. 주문 상세 코드 (ord_d_code) 자동 생성에 필요한 다음 번호 준비
+    const detailCodeLength = 4;
+    const detailRows = await conn.query("selectMaxOrderDetailCode");
+    let maxOrdDCode = detailRows[0]?.max_ord_d_code || null;
+    let nextOrdDNum = 1;
+
+    if (maxOrdDCode) {
+      // ORD-D-000X 형태에서 순번 추출
+      const lastNumStr = maxOrdDCode.slice(-detailCodeLength);
+      nextOrdDNum = parseInt(lastNumStr) + 1;
+    }
+
+    for (const p of products) {
+      // 수량 0 또는 제품 코드가 없는 행은 건너뜀 (필수 항목으로 가정)
+      if (Number(p.ord_amount) === 0 || !p.prod_code) continue;
+
+      const prod_code = p.prod_code; // 프론트에서 받은 제품 코드를 사용
+      const total_price =
+        (Number(p.ord_amount) || 0) * (Number(p.prod_price) || 0);
+
+      if (p.ord_d_code) {
+        // 3-2. 🔄 기존 제품 수정 (updateOrderDetail)
+        const updateParams = [
+          p.unit,
+          p.spec,
+          p.ord_amount,
+          p.prod_price,
+          p.delivery_date,
+          p.ord_priority,
+          total_price,
+          prod_code,
+          p.ord_d_code, // WHERE 조건
+        ];
+        await conn.query("updateOrderDetail", updateParams);
+      } else {
+        // 3-3. ✨ 신규 제품 등록 (insertOrderDetail)
+
+        // 새로운 상세 코드 생성: ORD-D- + 순번
+        const nextOrdDNumStr = String(nextOrdDNum++).padStart(
+          detailCodeLength,
+          "0"
+        );
+        const ord_d_code = `ORD-D-${nextOrdDNumStr}`;
+
+        const insertParams = [
+          ord_d_code,
+          p.unit,
+          p.spec,
+          p.ord_amount,
+          p.prod_price,
+          p.delivery_date,
+          p.ord_priority,
+          total_price,
+          new_ord_code, // 메인 주문 코드
+          prod_code,
+        ];
+
+        await conn.query("insertOrderDetail", insertParams);
+      }
     }
 
     // 트랜잭션 커밋
     await conn.commit();
-
-    return { ord_code };
+    return { ord_code: new_ord_code };
   } catch (err) {
     // 오류 발생 시 롤백
     await conn.rollback();
