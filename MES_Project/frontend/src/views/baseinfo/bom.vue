@@ -15,23 +15,47 @@ const searchForm = ref({
     endDate: null,
     useYn: null // null = 전체
 });
-const addSubMaterials = (items) => {
-    items.forEach((item) => {
+// const addSubMaterials = (items) => {
+//     items.forEach((item) => {
+//         subMaterialList.value.push({
+//             materialCode: item.mat_code,
+//             materialName: item.mat_name,
+//             materialType: item.prod_type,
+//             unit: item.unit,
+//             qty: 0,
+//             lossRate: 0
+//         });
+//     });
+// };
+
+const onSelectSubMaterial = (materials) => {
+    const existingCodes = new Set(subMaterialList.value.map((item) => item.materialCode));
+
+    materials.forEach((m) => {
+        // 이미 존재하면 추가하지 않음
+        if (existingCodes.has(m.mat_code)) {
+            return;
+        }
+
         subMaterialList.value.push({
-            materialCode: item.mat_code,
-            materialName: item.mat_name,
-            materialType: item.prod_type,
-            unit: item.unit,
-            qty: 0,
-            lossRate: 0
+            id: subMaterialList.value.length + 1,
+            materialCode: m.mat_code,
+            materialName: m.mat_name,
+            materialType: m.prod_type,
+            qty: m.req_qtt ?? 0,
+            unit: m.unit,
+            lossRate: m.loss_rate ?? 0
         });
     });
 };
+
 const typeMap = {
     i1: '완제품',
     i2: '반제품',
     i3: '부자재',
-    i4: '원자재'
+    i4: '원자재',
+    t1: '원자재',
+    t2: '부자재'
 };
 const useYnMap = {
     f2: '사용중',
@@ -84,6 +108,7 @@ const selectedSubMaterials = ref([]);
 
 const detailForm = ref({
     id: null,
+    prodCode: '',
     bomCode: '',
     itemName: '',
     itemType: null,
@@ -119,14 +144,28 @@ const onSearch = async () => {
     const res = await axios.post('/api/baseinfo/bom/search', payload);
     bomList.value = res.data;
 };
-
 const onSelectBom = async (e) => {
     const row = e.data;
     selectedBom.value = row;
 
-    // TODO: 선택한 품목 기준으로 상세/하위자재 조회 API 연동
+    const res = await axios.get(`/api/baseinfo/bom/mat/${row.prod_code}`);
+
+    // 하위 자재 조회
+    subMaterialList.value = res.data.map((m, idx) => ({
+        id: idx + 1,
+        materialCode: m.mat_code,
+        materialName: m.mat_name,
+        materialType: m.mat_type,
+        qty: m.req_qtt,
+        unit: m.unit,
+        lossRate: m.loss_rate,
+        bom_code: m.bom_code // ← 추가
+    }));
+
+    // 상세 영역
     detailForm.value = {
-        bomCode: row.prod_code,
+        bomCode: res.data[0]?.bom_code ?? '', // ← 핵심
+        prodCode: row.prod_code,
         itemName: row.prod_name,
         itemType: row.prod_type?.trim() || null,
         spec: row.spec,
@@ -135,25 +174,18 @@ const onSelectBom = async (e) => {
         regDate: row.regdate,
         remark: row.note
     };
-    const res = await axios.get(`/api/baseinfo/bom/mat/${row.prod_code}`);
-    subMaterialList.value = res.data.map((m) => ({
-        materialCode: m.mat_code,
-        materialName: m.mat_name,
-        materialType: m.mat_type,
-        qty: m.req_qtt,
-        unit: m.unit,
-        lossRate: m.loss_rate
-    }));
 };
 
 const onDeleteBom = () => {
     if (!selectedBom.value) return;
-    // TODO: 삭제 API 연동
-    bomList.value = bomList.value.filter((b) => b.id !== selectedBom.value.id);
+
+    bomList.value = bomList.value.filter((b) => b.prod_code !== selectedBom.value.prod_code);
+
     selectedBom.value = null;
+
     detailForm.value = {
         id: null,
-        bomCode: '',
+        prodCode: '',
         itemName: '',
         itemType: null,
         spec: '',
@@ -169,34 +201,37 @@ const onDownloadExcel = () => {
     console.log('엑셀 다운로드');
 };
 
-const onAddSubMaterial = () => {
-    const nextId = (subMaterialList.value[subMaterialList.value.length - 1]?.id || 0) + 1;
-    subMaterialList.value.push({
-        id: nextId,
-        materialCode: '',
-        materialName: '',
-        materialType: '',
-        qty: null,
-        unit: '',
-        lossRate: ''
-    });
-};
-
 const onDeleteSubMaterial = () => {
     const ids = new Set(selectedSubMaterials.value.map((m) => m.id));
     subMaterialList.value = subMaterialList.value.filter((m) => !ids.has(m.id));
     selectedSubMaterials.value = [];
 };
 
-const onCreate = () => {
-    // TODO: 등록 API 연동
-    console.log('등록', detailForm.value, subMaterialList.value);
-};
+const onCreate = async () => {
+    if (!detailForm.value.prodCode) {
+        alert('제품을 먼저 선택하세요.');
+        return;
+    }
 
-const onUpdate = () => {
-    // TODO: 수정 API 연동
-    console.log('수정', detailForm.value, subMaterialList.value);
+    const payload = {
+        bom_code: detailForm.value.bomCode,
+        materials: subMaterialList.value.map((m) => ({
+            mat_code: m.materialCode,
+            mat_name: m.materialName,
+            mat_type: m.materialType,
+            req_qtt: Number(m.qty),
+            unit: m.unit,
+            loss_rate: Number(m.lossRate)
+        }))
+    };
+
+    await axios.post('/api/baseinfo/bom/save', payload);
+    alert('저장 완료');
 };
+// const onUpdate = () => {
+//     // TODO: 수정 API 연동
+//     console.log('수정', detailForm.value, subMaterialList.value);
+// };
 </script>
 
 <template>
@@ -285,22 +320,49 @@ const onUpdate = () => {
                         </div>
                     </div>
 
-                    <DataTable :value="subMaterialList" dataKey="materialCode" v-model:selection="selectedSubMaterials" selectionMode="multiple" scrollable scrollHeight="flex" class="p-datatable-sm sub-material-table">
+                    <DataTable
+                        :value="subMaterialList"
+                        dataKey="materialCode"
+                        v-model:selection="selectedSubMaterials"
+                        selectionMode="multiple"
+                        scrollable
+                        scrollHeight="flex"
+                        class="p-datatable-sm sub-material-table"
+                        editMode="cell"
+                        @cell-edit-complete="onCellEditComplete"
+                    >
                         <Column selectionMode="multiple" headerStyle="width:3rem"></Column>
-                        <Column field="materialCode" header="자재코드" style="width: 120px"> </Column>
-                        <Column field="materialName" header="자재명"></Column>
+
+                        <Column field="materialCode" header="자재코드" style="width: 120px" />
+
+                        <Column field="materialName" header="자재명" />
+
                         <Column field="materialType" header="자재유형" style="width: 100px">
                             <template #body="{ data }">
                                 {{ typeMap[data.materialType] }}
                             </template>
                         </Column>
-                        <Column field="qty" header="소요수량" style="width: 90px"></Column>
+
+                        <!-- 소요수량 editable -->
+                        <Column field="qty" header="소요수량" style="width: 70px">
+                            <template #body="{ data }">
+                                <InputNumber v-model="data.qty" :min="0" :maxFractionDigits="3" inputStyle="width: 50px; text-align: center;" />
+                            </template>
+                        </Column>
+
+                        <!-- 단위 editable (Dropdown 제거, InputText 사용) -->
                         <Column field="unit" header="단위" style="width: 70px">
                             <template #body="{ data }">
                                 {{ unitMap[data.unit] }}
                             </template>
                         </Column>
-                        <Column field="lossRate" header="로스율" style="width: 90px"></Column>
+
+                        <!-- 로스율 editable -->
+                        <Column header="로스율" style="width: 50px">
+                            <template #body="{ data }">
+                                <InputNumber v-model="data.lossRate" input-style="width: 50px; text-align: center;" :minFractionDigits="0" :maxFractionDigits="4" />
+                            </template>
+                        </Column>
                     </DataTable>
                 </div>
             </div>
@@ -311,7 +373,7 @@ const onUpdate = () => {
                         <div class="flex-gap"></div>
                         <div class="right-header-buttons">
                             <Button label="등록" class="p-button-success p-button-sm" @click="onCreate" />
-                            <Button label="수정" class="p-button-primary p-button-sm" :disabled="!detailForm.id" @click="onUpdate" />
+                            <!-- <Button label="수정" class="p-button-primary p-button-sm" :disabled="!detailForm.id" @click="onUpdate" /> -->
                         </div>
                     </div>
 
@@ -319,7 +381,7 @@ const onUpdate = () => {
                         <div class="form-grid">
                             <div class="field">
                                 <label>등록코드</label>
-                                <InputText v-model="detailForm.bomCode" placeholder="자동입력" disabled />
+                                <InputText v-model="detailForm.prodCode" placeholder="자동입력" disabled />
                             </div>
 
                             <div class="field">
@@ -369,21 +431,28 @@ const onUpdate = () => {
         </div>
     </div>
     <BomProductModal v-model:visible="isModalVisible" @select="onProductSelect" />
-    <SubMaterialModal v-model:visible="isSubMaterialModal" @select="addSubMaterials" />
+    <SubMaterialModal v-model:visible="isSubMaterialModal" :selectedCodes="subMaterialList.map((m) => m.materialCode)" @select="onSelectSubMaterial" />
 </template>
 
 <style scoped>
 .bom-page {
     padding: 1rem;
-    /* 뷰포트 높이 기준으로 설정하여 위아래 스크롤 최소화 */
-    min-height: calc(100vh - 50px);
+    height: calc(100vh - 50px);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+:deep(.sub-material-table .p-datatable-tbody > tr) {
+    height: 50px; /* 원하는 높이 */
 }
 
+:deep(.sub-material-table .p-datatable-tbody > tr > td) {
+    vertical-align: middle;
+}
 /* 검색 영역 */
 .search-panel {
     margin-bottom: 1rem;
+
     display: flex;
     flex-direction: column;
 }
@@ -394,6 +463,7 @@ const onUpdate = () => {
     gap: 1rem;
     align-items: center;
     width: 100%;
+    height: 100%;
     font-weight: bolder;
     white-space: nowrap; /* 줄바꿈 방지 */
 }
@@ -404,6 +474,7 @@ const onUpdate = () => {
 }
 .search-row .field {
     display: flex;
+
     flex-direction: column;
     justify-content: flex-end;
 }
@@ -428,7 +499,7 @@ const onUpdate = () => {
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
     flex-grow: 1;
-    align-items: stretch; /* 좌우 카드 높이 1:1 일치 */
+    height: 100%;
 }
 .use-yes {
     background-color: #e6f7e9; /* 옅은 초록 */
@@ -447,6 +518,7 @@ const onUpdate = () => {
     flex-direction: column;
     gap: 1.5rem; /* 카드 사이 간격 */
     flex-grow: 1;
+    height: 800px;
 }
 
 /* 🎯 추가: 좌측 상단 카드 (품목 목록) */
@@ -456,6 +528,7 @@ const onUpdate = () => {
     flex-grow: 5;
     display: flex;
     flex-direction: column;
+    height: 300px;
 }
 
 /* 🎯 추가: 좌측 하단 카드 (하위 자재) */
@@ -470,7 +543,7 @@ const onUpdate = () => {
 /* 우측 카드 (상세 정보) */
 .right-pane-card {
     padding: 1.5rem;
-    height: 100%; /* content-layout 높이 꽉 채우기 */
+    height: 800px; /* content-layout 높이 꽉 채우기 */
     display: flex;
     flex-direction: column;
 }
@@ -498,6 +571,8 @@ const onUpdate = () => {
 /* DataTable이 남은 공간을 채우도록 flex-grow 설정 (PrimeVue scrollHeight="flex" 사용 전제) */
 .p-datatable {
     flex-grow: 1;
+    height: 200px;
+    overflow: auto; /* 내부 스크롤 */
 }
 
 .hint-text {
@@ -529,6 +604,7 @@ const onUpdate = () => {
     border: 1px solid var(--surface-border);
     border-radius: 4px;
     padding: 1rem;
+    height: 500px;
     background: var(--surface-card);
     flex-grow: 1; /* 남은 공간을 상세 폼이 채우도록 설정 */
 }
