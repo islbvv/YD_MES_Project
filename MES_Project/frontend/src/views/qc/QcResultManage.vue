@@ -1,9 +1,9 @@
 <script setup>
-import QcResultBasicInfo from '../../../components/qc/005/QcResultBasicInfo.vue';
-import QcResultInstructionInfo from '../../../components/qc/005/QcResultInstructionInfo.vue';
-import QcResultItemTable from '../../../components/qc/005/QcResultTable.vue';
-import QcSelectModal from '../../../components/qc/005/QcSelectModal.vue';
-import { useQcResultStore } from '../../../stores/qc/qcResultStore';
+import QcResultBasicInfo from '../../components/qc/005/QcResultBasicInfo.vue';
+import QcResultInstructionInfo from '../../components/qc/005/QcResultInstructionInfo.vue';
+import QcResultItemTable from '../../components/qc/005/QcResultTable.vue';
+import QcSelectModal from '../../components/qc/005/QcSelectModal.vue';
+import { useQcResultStore } from '../../stores/qc/qcResultStore';
 
 const qcStore = useQcResultStore();
 

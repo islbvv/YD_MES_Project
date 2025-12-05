@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue';
-import { getQcList } from '../../../service/qc/qcService';
+import { getQcList } from '../../service/qc/qcService';
 
 // QC용 컴포넌트
 import QcListSearch from '@/components/qc/004/QcListSearch.vue';
