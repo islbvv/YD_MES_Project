@@ -16,7 +16,11 @@ export const useQcResultStore = defineStore('qcResult', {
             qioCode: '',
             prodName: '',
             qcrCode: '',
-            inspVol: ''
+            inspVol: '',
+            checkMethod: '',
+            rangeTop: '',
+            rangeBot: '',
+            unit: ''
         },
 
         modal: {
@@ -25,10 +29,10 @@ export const useQcResultStore = defineStore('qcResult', {
             selectedRow: null
         },
 
-        // 테이블 데이터
+        // 테이블 행 갯수
         resultItems: [],
 
-        // 모달에서 선택된 코드
+        // 모달에서 선택한 코드
         selectedQir: ''
     }),
 
@@ -48,7 +52,7 @@ export const useQcResultStore = defineStore('qcResult', {
             const result = await getInstruction(this.selectedQir);
             this.basic = result.data[0];
             this.instruction = result.data[0];
-            this.resultItems = result.data[0];
+            this.resultItems = result.data;
         },
 
         async saveResult() {

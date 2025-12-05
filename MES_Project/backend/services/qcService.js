@@ -37,7 +37,6 @@ async function findInstructionService(params) {
   try {
     const result = await query('QC_INSTRUCTION', [params.qir_code]);
     console.log(result);
-    console.log(params);
     return result;
   } catch (err) {
     throw err;
