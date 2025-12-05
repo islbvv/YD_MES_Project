@@ -275,6 +275,82 @@ async function getClientList(keyword = "") {
 }
 
 /* ===========================
+ *  출고요청 조회 (ForwardingCheck)
+ *  라우터: GET /api/release/fwd/check
+ *  query: releaseNo, productName, qtyFrom, qtyTo, dateFrom, dateTo, manager, client
+ * =========================== */
+async function getForwardingCheckList(params = {}) {
+  const {
+    releaseNo = "",
+    productName = "",
+    qtyFrom = "",
+    qtyTo = "",
+    dateFrom = "",
+    dateTo = "",
+    manager = "",
+    client = "",
+  } = params;
+
+  const where = [];
+  const values = [];
+
+  if (releaseNo) {
+    where.push("orq.out_req_code LIKE ?");
+    values.push(`%${releaseNo}%`);
+  }
+
+  if (productName) {
+    where.push("p.prod_name LIKE ?");
+    values.push(`%${productName}%`);
+  }
+
+  if (qtyFrom !== "" && qtyFrom != null) {
+    where.push("ord.out_req_d_amount >= ?");
+    values.push(Number(qtyFrom));
+  }
+
+  if (qtyTo !== "" && qtyTo != null) {
+    where.push("ord.out_req_d_amount <= ?");
+    values.push(Number(qtyTo));
+  }
+
+  if (dateFrom) {
+    where.push("orq.out_req_date >= ?");
+    values.push(dateFrom);
+  }
+
+  if (dateTo) {
+    where.push("orq.out_req_date <= ?");
+    values.push(dateTo);
+  }
+
+  if (manager) {
+    where.push("e.emp_name LIKE ?");
+    values.push(`%${manager}%`);
+  }
+
+  if (client) {
+    where.push("c.client_name LIKE ?");
+    values.push(`%${client}%`);
+  }
+
+  const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const listSql = fwdSQL.SELECT_FORWARDING_CHECK_LIST.replace(
+    "/*WHERE*/",
+    whereSQL
+  );
+
+  const conn = await db.getConnection();
+  try {
+    const rows = await conn.query(listSql, values);
+    console.log("[getForwardingCheckList] rows.length =", rows.length);
+    return rows; // [{ releaseNo, productName, qty, date, manager, client, status }]
+  } finally {
+    conn.release();
+  }
+}
+
+/* ===========================
  *   출고요청 생성/수정/삭제
  * =========================== */
 
@@ -493,4 +569,5 @@ module.exports = {
   getForwardingCommonCodes,
   getProductList,
   getClientList,
+  getForwardingCheckList,
 };

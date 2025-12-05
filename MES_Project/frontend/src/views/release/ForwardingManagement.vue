@@ -719,10 +719,11 @@ const fetchCommonCodes = async () => {
     gap: 0.5rem;
 }
 
+/* 버튼 – 모달 버튼이랑 사이즈 맞춤 */
 .btn {
     border: none;
     padding: 10px 20px;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 14px;
     cursor: pointer;
     white-space: nowrap;
@@ -731,29 +732,21 @@ const fetchCommonCodes = async () => {
 .btn-red {
     background: #ff6b6b;
     color: white;
-    padding: 8px 14px;
-    border-radius: 6px;
 }
 
 .btn-black {
     background: #000;
     color: white;
-    padding: 8px 14px;
-    border-radius: 6px;
 }
 
 .btn-blue {
     background: #4ea3ff;
     color: white;
-    padding: 8px 14px;
-    border-radius: 6px;
 }
 
 .btn-outline-green {
     background: #4ecb79;
     color: white;
-    padding: 8px 14px;
-    border-radius: 6px;
 }
 
 .forward-card {
@@ -786,6 +779,7 @@ const fetchCommonCodes = async () => {
     display: inline-block;
 }
 
+/* 폼 영역 – 인풋도 모달이랑 느낌 맞춤 */
 .form-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -814,8 +808,8 @@ const fetchCommonCodes = async () => {
 .form-textarea {
     border: 1px solid #d0d7e2;
     border-radius: 4px;
-    padding: 10px;
-    font-size: 0.85rem;
+    padding: 10px; /* 🔹 모달 검색 인풋과 동일 */
+    font-size: 14px;
     outline: none;
 }
 
@@ -846,10 +840,11 @@ const fetchCommonCodes = async () => {
     overflow-y: auto;
 }
 
+/* 🔹 테이블 스타일 – SearchSelectModal 테이블과 최대한 통일 */
 .forward-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.85rem;
+    font-size: 14px; /* 모달 테이블과 동일 */
 }
 
 .forward-table thead {
@@ -858,7 +853,7 @@ const fetchCommonCodes = async () => {
 
 .forward-table th,
 .forward-table td {
-    padding: 0.5rem 0.6rem;
+    padding: 10px; /* 모달 테이블과 동일 */
     border: 1px solid #e0e4f0;
     text-align: left;
 }
@@ -876,19 +871,33 @@ const fetchCommonCodes = async () => {
     color: #888;
 }
 
-/* 출고수량 입력 */
+/* 출고수량 입력 – 테이블 셀 크기에 맞게 */
 .qty-input {
     width: 80px;
-    padding: 4px 6px;
+    padding: 6px 8px;
     border: 1px solid #cbd5e1;
     border-radius: 4px;
     text-align: right;
-    font-size: 0.8rem;
+    font-size: 13px;
 }
 
 .qty-input:focus {
     outline: none;
     border-color: #1976d2;
+}
+
+/* 기본 값은 중앙 정렬 */
+.result-table th,
+.result-table td,
+.forward-table th,
+.forward-table td {
+    text-align: center;
+}
+
+/* 숫자 전용 클래스는 오른쪽 */
+.num,
+.text-right {
+    text-align: right !important;
 }
 
 /* 반응형 - 좁은 화면에서 여백/레이아웃 조정 */

@@ -4,6 +4,9 @@ import { reactive, ref, computed } from 'vue';
 import SearchSelectModal from '@/components/common/SearchSelectModal.vue';
 import axios from 'axios';
 
+// 선택된 행들
+const selectedRows = computed(() => rows.value.filter((r) => r.checked));
+
 /* ===========================
  *  검색 폼 & 결과 리스트
  * =========================== */
@@ -80,14 +83,69 @@ const resetForm = () => {
     searchForm.client = '';
 };
 
-const doSearch = () => {
-    // 나중에 실제 API 검색 붙이면 여기서 호출
-    console.log('조회 클릭', { ...searchForm });
+const doSearch = async () => {
+    try {
+        const res = await axios.get('/api/release/fwd/check', {
+            params: { ...searchForm }
+        });
+
+        const list = Array.isArray(res.data?.data) ? res.data.data : [];
+
+        rows.value = list.map((row, idx) => ({
+            id: idx,
+            checked: false,
+            ...row // releaseNo, productName, qty, date, manager, client, status
+        }));
+
+        console.log('[ForwardingCheck] 검색 결과:', rows.value);
+    } catch (err) {
+        console.error('[ForwardingCheck] 조회 실패:', err);
+        alert('출고요청 조회 중 오류가 발생했습니다.');
+    }
 };
 
 const downloadExcel = () => {
-    // 나중에 실제 엑셀 다운로드 로직 연결
-    console.log('엑셀 다운로드 클릭');
+    // 1) 체크된 행 기준
+    const target = selectedRows.value.length ? selectedRows.value : [];
+
+    if (!target.length) {
+        alert('엑셀로 내보낼 출고내역을 선택해주세요.');
+        return;
+    }
+
+    // 2) 헤더 정의
+    const headers = ['출고번호', '출고제품', '출고수량', '출고일자', '출고담당자', '거래처', '상태'];
+
+    // 3) 실제 데이터 행
+    const dataRows = target.map((r) => [r.releaseNo || '', r.productName || '', r.qty ?? '', r.date || '', r.manager || '', r.client || '', r.status || '']);
+
+    // 4) CSV 문자열 만들기 (엑셀에서 바로 열 수 있음)
+    const escapeCell = (value) => {
+        const s = value == null ? '' : String(value);
+        // 콤마/따옴표/개행 있으면 따옴표로 감싸기
+        if (s.includes('"') || s.includes(',') || s.includes('\n')) {
+            return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+    };
+
+    const csvContent = [headers, ...dataRows].map((row) => row.map(escapeCell).join(',')).join('\r\n');
+
+    // 5) Blob 만들고 다운로드 트리거
+    const blob = new Blob(['\uFEFF' + csvContent], {
+        type: 'text/csv;charset=utf-8;'
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    a.href = url;
+    a.download = `출고요청조회_${today}.csv`; // 엑셀에서 바로 열리는 CSV
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 };
 
 /* ===========================
@@ -480,11 +538,11 @@ const handleCancelClient = () => {
     background: #f5f6fa;
     display: flex;
     flex-direction: column;
-    height: 100%; /* ✅ 부모 높이만 따라감 (100vh 강제 X) */
+    height: 100%;
     box-sizing: border-box;
-    overflow: hidden; /* ✅ 페이지 자체 스크롤 막기 */
-    flex: 1; /* ✅ 상위 flex 레이아웃 안에서 남는 높이 차지 */
-    min-height: 0; /* ✅ 내부 스크롤 영역이 제대로 계산되도록 */
+    overflow: hidden;
+    flex: 1;
+    min-height: 0;
 }
 
 /* 🔍 검색 카드 */
@@ -494,8 +552,13 @@ const handleCancelClient = () => {
     padding: 1.25rem 1.5rem 1rem;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
     margin-bottom: 1.25rem;
+    flex-shrink: 0;
+}
 
-    flex-shrink: 0; /* ✅ 높이 줄어들지 않게 고정 */
+.search-card h3 {
+    margin: 0 0 0.8rem;
+    font-size: 16px;
+    font-weight: 600;
 }
 
 .search-grid {
@@ -507,7 +570,6 @@ const handleCancelClient = () => {
 .field {
     display: flex;
     flex-direction: column;
-    font-size: 0.85rem;
 }
 
 .field-range .range-row {
@@ -521,12 +583,14 @@ const handleCancelClient = () => {
     color: #333;
 }
 
+/* 🔹 인풋 – 모달/ForwardingManagement 와 맞춤 */
 .input {
     border: 1px solid #d0d7e2;
     border-radius: 4px;
-    padding: 0.35rem 0.5rem;
-    font-size: 0.85rem;
+    padding: 10px; /* ✅ 10px 통일 */
+    font-size: 14px;
     outline: none;
+    box-sizing: border-box;
 }
 
 .input:focus {
@@ -540,7 +604,7 @@ const handleCancelClient = () => {
 }
 
 .range-dash {
-    font-size: 0.8rem;
+    font-size: 12px;
     color: #666;
 }
 
@@ -551,12 +615,12 @@ const handleCancelClient = () => {
     gap: 0.5rem;
 }
 
-/* 버튼 */
+/* 🔹 버튼 – SearchSelectModal / ForwardingManagement 와 맞춤 */
 .btn {
     border: none;
-    border-radius: 4px;
-    padding: 0.4rem 0.9rem;
-    font-size: 0.85rem;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-size: 14px;
     cursor: pointer;
     white-space: nowrap;
 }
@@ -564,18 +628,15 @@ const handleCancelClient = () => {
 .btn-black {
     background: #000;
     color: white;
-    padding: 8px 14px;
-    border-radius: 6px;
 }
 
 .btn-yellow {
     background: #ffc94a;
-    padding: 8px 14px;
-    border-radius: 6px;
+    color: #000;
 }
 
 .btn-excel {
-    padding: 7px 16px;
+    padding: 8px 18px;
     font-size: 13px;
     border-radius: 6px;
     border: 1px solid #6cbf5a;
@@ -590,8 +651,8 @@ const handleCancelClient = () => {
     padding: 1rem 1.5rem 1.25rem;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 
-    flex: 1; /* ✅ 남은 높이 전부 차지 */
-    min-height: 0; /* ✅ 내부 스크롤 가능하게 */
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
 }
@@ -601,7 +662,7 @@ const handleCancelClient = () => {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 0.75rem;
-    font-size: 0.85rem;
+    font-size: 14px;
 }
 
 .result-count {
@@ -611,33 +672,34 @@ const handleCancelClient = () => {
 /* 📌 테이블 래퍼 – 여기만 스크롤 */
 .table-wrap {
     width: 100%;
-    flex: 1; /* ✅ result-card 안에서 남은 높이 채움 */
-    overflow-y: auto; /* ✅ 테이블만 세로 스크롤 */
+    flex: 1;
+    overflow-y: auto;
     overflow-x: auto;
 }
 
-/* 테이블 */
+/* 🔹 테이블 – SearchSelectModal 테이블 스타일과 맞추기 */
 .result-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.85rem;
+    font-size: 14px;
 }
 
 .result-table thead {
     background: #f9f9fb;
-    position: sticky; /* ✅ 스크롤 시 헤더 고정 */
+    position: sticky;
     top: 0;
     z-index: 10;
 }
 
 .result-table th,
 .result-table td {
-    padding: 0.45rem 0.6rem;
+    padding: 10px; /* ✅ 모달 테이블과 동일 패딩 */
     border: 1px solid #e0e4f0;
 }
 
 .result-table th {
     text-align: left;
+    font-weight: 600;
 }
 
 .text-right {
@@ -651,7 +713,21 @@ const handleCancelClient = () => {
 
 /* 출고수량 input 너비 조절 */
 .field-range.qty-range .range-row .input {
-    width: 125px; /* 🔥 원래보다 좁게 */
+    width: 130px;
+}
+
+/* 기본 값은 중앙 정렬 */
+.result-table th,
+.result-table td,
+.forward-table th,
+.forward-table td {
+    text-align: center;
+}
+
+/* 숫자 전용 클래스는 오른쪽 */
+.num,
+.text-right {
+    text-align: right !important;
 }
 
 /* 반응형 */

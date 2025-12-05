@@ -74,7 +74,7 @@ router.get("/orders/:orderNo", async (req, res) => {
  * =========================== */
 
 /**
- * 출고전표 리스트 조회 (모달용)
+ * 출고요청 리스트 조회 (모달용)
  * GET /api/release/fwd
  * query: keyword, fromDate, toDate, client, status
  */
@@ -105,6 +105,47 @@ router.get("/", async (req, res) => {
     return res.status(500).json({
       status: "error",
       message: "출고전표 목록 조회 중 오류가 발생했습니다.",
+    });
+  }
+});
+
+/**
+ * 출고요청 조회 (ForwardingCheck)
+ * GET /api/release/fwd/check
+ */
+router.get("/check", async (req, res) => {
+  try {
+    const {
+      releaseNo = "",
+      productName = "",
+      qtyFrom = "",
+      qtyTo = "",
+      dateFrom = "",
+      dateTo = "",
+      manager = "",
+      client = "",
+    } = req.query;
+
+    const rows = await fwdService.getForwardingCheckList({
+      releaseNo,
+      productName,
+      qtyFrom,
+      qtyTo,
+      dateFrom,
+      dateTo,
+      manager,
+      client,
+    });
+
+    return res.json({
+      status: "success",
+      data: rows,
+    });
+  } catch (err) {
+    console.error("[fwdRouter] GET /check error:", err);
+    return res.status(500).json({
+      status: "error",
+      message: "출고요청 조회 중 오류가 발생했습니다.",
     });
   }
 });

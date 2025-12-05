@@ -389,6 +389,36 @@ const SELECT_CLIENT_LIST = `
     c.client_name ASC
 `;
 
+/* ===========================
+ *  출고요청 조회 리스트 (ForwardingCheck)
+ *  프론트 컬럼:
+ *   - releaseNo, productName, qty, date, manager, client, status
+ * =========================== */
+const SELECT_FORWARDING_CHECK_LIST = `
+  SELECT
+    orq.out_req_code                          AS releaseNo,
+    p.prod_name                               AS productName,
+    ord.out_req_d_amount                      AS qty,
+    DATE_FORMAT(orq.out_req_date, '%Y-%m-%d') AS date,
+    e.emp_name                                AS manager,
+    c.client_name                             AS client,
+    '요청'                                     AS status
+  FROM out_req_tbl orq
+  LEFT JOIN out_req_d_tbl ord
+    ON ord.out_req_code = orq.out_req_code
+  LEFT JOIN prod_tbl p
+    ON p.prod_code = ord.prod_code
+  LEFT JOIN emp_tbl e
+    ON e.emp_code = orq.mcode
+  LEFT JOIN client_tbl c
+    ON c.client_code = orq.client_code
+  /*WHERE*/
+  ORDER BY
+    orq.out_req_date DESC,
+    orq.out_req_code DESC,
+    p.prod_name ASC
+`;
+
 module.exports = {
   SELECT_ORDER_LIST,
   SELECT_ORDER_HEADER,
@@ -407,4 +437,5 @@ module.exports = {
   DELETE_OUT_REQ_D_BY_HEADER,
   SELECT_PRODUCT_LIST,
   SELECT_CLIENT_LIST,
+  SELECT_FORWARDING_CHECK_LIST,
 };
