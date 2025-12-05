@@ -10,9 +10,10 @@ export default [
         component: () => import('@/views/po/PurchaseReqList.vue')
     },
     {
-        path: '/purchaseReqDetail',
+        path: '/purchaseReqDetail/:mprCode',
         name: 'purchaseRequestDetail',
-        component: () => import('@/views/po/PurchaseReqDetail.vue')
+        component: () => import('@/views/po/PurchaseReqDetail.vue'),
+        props: true
     },
     {
         path: '/po',
