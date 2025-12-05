@@ -155,6 +155,24 @@ router.get("/mpr/list", async (req, res) => {
   }
 });
 
+// 자재 구매요청서 자재별 목록 조회
+router.get("/mpr/req-items", async (req, res) => {
+  try {
+    const rows = await poService.getMprRequestItemList();
+
+    res.json({
+      success: true,
+      data: rows,
+    });
+  } catch (err) {
+    console.error("요청 자재 목록 조회 오류:", err);
+    res.status(500).json({
+      success: false,
+      message: "요청 자재 목록 조회 중 오류가 발생했습니다.",
+    });
+  }
+});
+
 // 자재 구매요청서 단건 조회
 router.get("/mpr/:mprCode", async (req, res) => {
   try {
@@ -174,6 +192,47 @@ router.get("/mpr/:mprCode", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "자재 구매요청서 조회 실패",
+    });
+  }
+});
+
+// 요청 상세 조회
+router.get("/mpr/detail/:mprCode", async (req, res) => {
+  try {
+    const { mprCode } = req.params;
+
+    if (!mprCode) {
+      return res.status(400).json({
+        success: false,
+        message: "mprCode가 필요합니다.",
+      });
+    }
+
+    // 병렬로 조회 (속도)
+    const [header, items] = await Promise.all([
+      poService.getMprDetailHeader(mprCode),
+      poService.getMprDetailItems(mprCode),
+    ]);
+
+    if (!header) {
+      return res.status(404).json({
+        success: false,
+        message: "해당 요청서를 찾을 수 없습니다.",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        header,
+        items,
+      },
+    });
+  } catch (err) {
+    console.error("요청 상세 조회 오류:", err);
+    res.status(500).json({
+      success: false,
+      message: "요청 상세 조회 중 오류가 발생했습니다.",
     });
   }
 });
