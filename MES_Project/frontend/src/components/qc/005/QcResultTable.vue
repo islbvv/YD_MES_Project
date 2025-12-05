@@ -1,18 +1,17 @@
 <script setup>
-defineProps({
-    rows: {
-        type: Array,
-        required: true
-    }
-});
+import { storeToRefs } from 'pinia';
+import { useQcResultStore } from '@/stores/qc/qcResultStore';
+
+const qcStore = useQcResultStore();
+const { resultItems } = storeToRefs(qcStore);
 </script>
 
 <template>
-    <DataTable :value="rows" showGridlines size="small">
+    <DataTable :value="resultItems" showGridlines size="small">
         <!-- 선택 체크박스 -->
         <Column header="">
-            <template #body="slotProps">
-                <Checkbox v-model="slotProps.data.selected" />
+            <template #body="{ data }">
+                <Checkbox v-model="data.selected" />
             </template>
         </Column>
 
@@ -22,20 +21,20 @@ defineProps({
         <Column field="unit" header="단위" />
 
         <Column field="value" header="검사값">
-            <template #body="slotProps">
-                <InputText v-model="slotProps.data.value" />
+            <template #body="{ data }">
+                <InputText v-model="data.value" />
             </template>
         </Column>
 
         <Column field="judge" header="판정">
-            <template #body="slotProps">
-                <InputText v-model="slotProps.data.judge" readonly />
+            <template #body="{ data }">
+                <InputText v-model="data.judge" readonly />
             </template>
         </Column>
 
         <Column field="note" header="비고">
-            <template #body="slotProps">
-                <InputText v-model="slotProps.data.note" />
+            <template #body="{ data }">
+                <InputText v-model="data.note" />
             </template>
         </Column>
     </DataTable>
