@@ -1,4 +1,5 @@
 <script setup>
+// TaskProgressListTable.vue
 import { computed, defineProps, defineEmits } from 'vue';
 import { useWorkStore } from '@/stores/workStore.js';
 import { useRouter } from 'vue-router';
@@ -50,6 +51,18 @@ const formatStat = (stat) => {
     }
     return value;
 };
+const formatDate = (dateString) => {
+    if (!dateString) return "";
+
+    const d = new Date(dateString);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+
+    return `${y}-${m}-${day} ${hh}:${mm}`;
+};
 
 const downloadExcel = () => {
     emit('download');
@@ -86,13 +99,13 @@ const downloadExcel = () => {
 
                     <tr v-for="row in props.rows" :key="row.id" @click="goLink(row)">
                         <td>
-                            <input v-model="row.checked" type="checkbox" />
+                            <input v-model="row.checked" type="checkbox" @click.stop />
                         </td>
                         <td>{{ row.code }}</td>
                         <td>{{ row.name }}</td>
                         <td>{{ row.line }}</td>
-                        <td>{{ row.start }}</td>
-                        <td>{{ row.end }}</td>
+                        <td>{{ formatDate(row.start) }}</td>
+                        <td>{{ formatDate(row.end) }}</td>
                         <td>{{ formatStat(row.stat) }}</td>
                     </tr>
                 </tbody>
