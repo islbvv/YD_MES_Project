@@ -49,13 +49,11 @@ JOIN common_code c ON c.com_value = qcr.unit
 WHERE qir.qir_code = ?
 `;
 
-const QC_INSTRUCTION_SAVE = `
-UPDATE qir_tbl
-SET result = ?
-WHERE qir_code = ?
+const QC_RESULT_SAVE = `
+CALL UPDATE_QIR_RESULT(?, ?, ?, ?, ?)
 `;
 
-const QC_INSTRUCTION_DELETE = `
+const QC_RESULT_DELETE = `
 DELETE FROM qir_tbl
 WHERE qir_code = ?
 `;
@@ -64,6 +62,6 @@ module.exports = {
   QC_SEARCH,
   QC_PENDING_LIST,
   QC_INSTRUCTION,
-  QC_INSTRUCTION_SAVE,
-  QC_INSTRUCTION_DELETE,
+  QC_RESULT_SAVE,
+  QC_RESULT_DELETE,
 };

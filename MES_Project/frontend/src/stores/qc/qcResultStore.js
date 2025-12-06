@@ -1,11 +1,13 @@
 import { defineStore } from 'pinia';
-import { getPendingList, getInstruction, saveQcResult } from '../../service/qc/qcService';
-import { dateFormatUtil } from '../../components/qc/utils/dateFormat';
+import { getPendingList, getInstruction, saveResult } from '../../service/qc/qcService';
+import { dateTime } from '../../components/qc/utils/dateFormat';
 
 export const useQcResultStore = defineStore('qcResult', {
     state: () => ({
+        // 기본정보
         basic: {},
 
+        // 지시정보
         instruction: {},
 
         modal: {
@@ -53,7 +55,7 @@ export const useQcResultStore = defineStore('qcResult', {
                 alert('등록된 검사지시가 없습니다.');
                 return;
             }
-            this.basic.qirEmpCode = 'seung02';
+            this.basic.qirEmpCode = 'EMP-10011';
             this.basic.value = '';
             this.instruction = result.data[0];
             this.resultItems = result.data;
@@ -64,10 +66,14 @@ export const useQcResultStore = defineStore('qcResult', {
                 alert('검사결과를 확인해주세요.');
                 return;
             }
-            this.basic.endDate = dateFormatUtil();
-
-            console.log(this.basic);
-            // await saveQcResult(payload);
+            this.basic.endDate = dateTime();
+            const result = await saveResult(this.basic);
+            if (result.data.affectedRows == 0) {
+                alert('품질검사결과 저장 중 오류 발생');
+                return;
+            }
+            alert('품질검사결과 저장 완료');
+            this.reset();
         },
 
         closeModal() {
@@ -77,13 +83,9 @@ export const useQcResultStore = defineStore('qcResult', {
         selectedQirCode() {
             this.selectedQir = this.modal.selectedRow?.qirCode;
             this.basic.qirCode = this.selectedQir;
-            this.basic.qirEmpCode = 'seung01';
-            this.basic.startDate = dateFormatUtil();
+            this.basic.qirEmpCode = 'EMP-10011';
+            this.basic.startDate = dateTime();
             this.closeModal();
-        },
-
-        reset() {
-            this.$reset();
         },
 
         textClean(row) {
@@ -96,6 +98,10 @@ export const useQcResultStore = defineStore('qcResult', {
             row.result = v >= row.rangeBot && v <= row.rangeTop ? '합격' : '불합격';
             this.basic.value = row.value;
             this.basic.result = row.result == '합격' ? 'g2' : 'g1';
+        },
+
+        reset() {
+            this.$reset();
         }
     }
 });

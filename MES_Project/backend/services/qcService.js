@@ -36,7 +36,6 @@ async function pendingListService() {
 async function findInstructionService(params) {
   try {
     const result = await query('QC_INSTRUCTION', [params.qir_code]);
-    console.log(result);
     return result;
   } catch (err) {
     throw err;
@@ -44,20 +43,25 @@ async function findInstructionService(params) {
 }
 
 // 005 저장
-async function saveInstructionService(data) {
+async function saveResultService(data) {
   try {
-    const resultData = Object.values(data);
-    console.log(resultData);
-    // return await query('QC_INSTRUCTION_SAVE', resultData);
+    const params = [
+      data.qir_code,
+      data.start_date,
+      data.end_date,
+      data.result,
+      data.qir_emp_code,
+    ];
+    return await query('QC_RESULT_SAVE', params);
   } catch (err) {
     throw err;
   }
 }
 
-async function deleteInstructionService(params) {
+async function deleteResultService(params) {
   try {
     console.log(params);
-    // return await query('QC_INSTRUCTION_DELETE', params);
+    // return await query('QC_RESULT_DELETE', params);
   } catch (err) {
     throw err;
   }
@@ -67,6 +71,6 @@ module.exports = {
   qcFindAllService,
   pendingListService,
   findInstructionService,
-  saveInstructionService,
-  deleteInstructionService,
+  saveResultService,
+  deleteResultService,
 };

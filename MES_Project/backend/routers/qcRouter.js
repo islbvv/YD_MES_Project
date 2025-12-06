@@ -33,9 +33,9 @@ router.get('/instruction/:qir_code', async (req, res) => {
 });
 
 // 005 저장
-router.post('/save', async (req, res) => {
+router.put('/save', async (req, res) => {
   try {
-    const result = await qcService.saveInstructionService(req.body);
+    const result = await qcService.saveResultService(req.body);
     res.json(result);
   } catch (err) {
     res.status(500).json({ ok: false, message: 'save Route Error' });
@@ -45,7 +45,7 @@ router.post('/save', async (req, res) => {
 // 005 삭제
 router.delete('/:qirCode', async (req, res) => {
   try {
-    const result = await qcService.deleteInstructionService(req.params);
+    const result = await qcService.deleteResultService(req.params);
     res.json(result);
   } catch (err) {
     res.status(500).json({ ok: false, message: 'delete Route Error' });
