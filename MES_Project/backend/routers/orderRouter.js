@@ -45,6 +45,24 @@ router.get("/search", async (req, res, next) => {
   }
 });
 
+// GET /order/product/search - 상품 모달창 조회
+router.get("/product/search", async (req, res, next) => {
+  try {
+    // 쿼리스트링에서 검색 조건 받기
+    const filters = {
+      prod_code: req.query.prod_code || null,
+      prod_name: req.query.prod_name || null,
+      com_value_name: req.query.com_value_name || null,
+    };
+
+    const searchs = await orderService.getProductSearch(filters);
+
+    res.json({ code: "S200", data: searchs });
+  } catch (err) {
+    next(err); // 에러를 전역 오류 처리 미들웨어로 전달
+  }
+});
+
 // GET /order/production - 주문 정보, 제품 정보 조회
 router.get("/production", async (req, res, next) => {
   try {

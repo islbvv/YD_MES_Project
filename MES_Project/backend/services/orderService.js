@@ -66,6 +66,31 @@ exports.getOrderSearch = async (filters) => {
   }
 };
 
+// 상품 모달창 조회
+exports.getProductSearch = async (filters) => {
+  try {
+    const params = [
+      filters.prod_code,
+      filters.prod_code,
+      filters.prod_code,
+      filters.prod_name,
+      filters.prod_name,
+      filters.prod_name,
+      filters.com_value_name,
+      filters.com_value_name,
+      filters.com_value_name,
+    ];
+
+    const rows = await query("selectProductSearch", params);
+    if (!rows || !rows.length) return [];
+
+    return rows;
+  } catch (err) {
+    console.error("[orderService.js || 상품 모달창 조회 실패]", err.message);
+    throw err;
+  }
+};
+
 // 주문 정보, 제품 정보 조회
 exports.getOrderProduction = async (ord_code) => {
   try {
@@ -166,88 +191,42 @@ exports.saveOrder = async (payload) => {
   try {
     await conn.beginTransaction();
 
-    const { order, orderDetail } = payload;
+    const { order, orderDetailList } = payload;
     let { ord_code, ord_name, ord_date, ord_stat, note, mcode, client_code } =
       order;
-    let {
-      ord_d_code,
-      unit,
-      spec,
-      ord_amount,
-      prod_price,
-      delivery_date,
-      ord_priority,
-      total_price,
-      prod_code,
-    } = orderDetail;
 
-    // 1. 주문 코드, 주문 상세 코드, 상태값 준비
-    // 필수 값 검증
+    // ------------------------------
+    // 1. 주문 필수 값 검증
+    // ------------------------------
     if (!ord_name || !ord_date || !ord_stat || !mcode || !client_code) {
-      throw new Error(
-        "필수 정보(주문명, 주문일자, 주문상태, 담당자 코드, 거래처 코드)가 누락되어 주문 정보를 저장할 수 없습니다."
-      );
+      throw new Error("필수 주문 정보 누락");
     }
-    ord_stat = ord_stat || "a1"; // 상태값 (없으면 기본값 'a1': 주문전달 사용)
 
-    if (
-      !unit ||
-      !ord_amount ||
-      !prod_price ||
-      !delivery_date ||
-      !total_price ||
-      !prod_code
-    ) {
-      throw new Error(
-        "필수 정보(단위, 수량, 단가, 납기일, 총액, 상품 코드)가 누락되어 주문 상세 정보를 저장할 수 없습니다."
-      );
-    }
+    ord_stat = ord_stat || "a1";
 
     let new_ord_code = ord_code;
 
-    // 2. 주문 정보 처리: 등록 + 수정
-    // 등록(주문번호 없을 때)
+    // ------------------------------
+    // 2. 주문 등록 OR 수정
+    // ------------------------------
     if (!new_ord_code) {
-      // 새로운 주문번호 생성 (ORD-YYYYXXXX)
+      // 신규 주문번호 생성
       const currentYear = new Date().getFullYear().toString();
       const codeLength = 4;
 
-      // 최대 주문 코드 조회 및 새 번호 생성
-      const oRows = await conn.query("selectMaxOrderCode");
+      const oRows = await query("selectMaxOrderCode");
       const oMaxCode = oRows[0]?.max_ord_code || null;
-      let oNextCodeNum = 1;
 
-      if (oMaxCode) {
-        // 최대 주문 번호에서 마지막 숫자를 추출하여 +1
-        const lastNumStr = oMaxCode.slice(-codeLength);
-        oNextCodeNum = parseInt(lastNumStr) + 1;
-      }
+      let nextNum = 1;
+      if (oMaxCode) nextNum = parseInt(oMaxCode.slice(-codeLength)) + 1;
 
-      // 새로운 주문 코드 생성: ORD-YYYY + 순번
-      new_ord_code = `ORD-${currentYear}${String(oNextCodeNum).padStart(
+      new_ord_code = `ORD-${currentYear}${String(nextNum).padStart(
         codeLength,
         "0"
       )}`;
 
-      // 최대 주문 상세 코드 조회 및 새 번호 생성
-      const new_ord_d_code = ord_d_code;
-      const dRows = await conn.query("selectMaxOrderDetailCode");
-      const dMaxCode = dRows[0]?.max_ord_d_code || null;
-      let dNextCodeNum = 1;
-
-      if (dMaxCode) {
-        // 최대 주문 상세 번호에서 마지막 숫자를 추출하여 +1
-        const lastNumStr = dMaxCode.slice(-codeLength);
-        dNextCodeNum = parseInt(lastNumStr) + 1;
-      }
-      // 새로운 주문 상세 코드 생성: ORD-D- + 순번
-      new_ord_d_code = `ORD-D-${String(dNextCodeNum).padStart(
-        codeLength,
-        "0"
-      )}`;
-
-      // 주문 정보 등록 (insertOrder)
-      const orderParams = [
+      // 주문 INSERT
+      await query("insertOrder", [
         new_ord_code,
         ord_name,
         ord_date,
@@ -255,12 +234,26 @@ exports.saveOrder = async (payload) => {
         note,
         mcode,
         client_code,
-      ];
-      await conn.query("insertOrder", orderParams);
+      ]);
+    } else {
+      // 주문 UPDATE
+      await query("updateOrder", [
+        ord_name,
+        ord_date,
+        ord_stat,
+        note,
+        mcode,
+        client_code,
+        new_ord_code,
+      ]);
+    }
 
-      // 주문 상세 정보 등록 (insertOrderDetail)
-      const orderDetailParams = [
-        new_ord_d_code,
+    // ------------------------------
+    // 3. 주문 상세 다중 저장 처리
+    // ------------------------------
+    for (const d of orderDetailList) {
+      let {
+        ord_d_code,
         unit,
         spec,
         ord_amount,
@@ -268,21 +261,61 @@ exports.saveOrder = async (payload) => {
         delivery_date,
         ord_priority,
         total_price,
-        new_ord_code,
         prod_code,
-      ];
-      await conn.query("insertOrderDetail", orderDetailParams);
+      } = d;
+
+      // 상세 필수값 체크
+      if (!unit || !delivery_date || !prod_code) {
+        throw new Error("상세 정보 누락");
+      }
+
+      // 신규 상세등록
+      if (!ord_d_code) {
+        const dRows = await query("selectMaxOrderDetailCode");
+        const dMaxCode = dRows[0]?.max_ord_d_code || null;
+
+        let nextNum = 1;
+        if (dMaxCode) nextNum = parseInt(dMaxCode.slice(-4)) + 1;
+
+        ord_d_code = `ORD-D-${String(nextNum).padStart(4, "0")}`;
+
+        await query("insertOrderDetail", [
+          ord_d_code,
+          unit,
+          spec,
+          ord_amount,
+          prod_price,
+          delivery_date,
+          ord_priority,
+          total_price,
+          new_ord_code,
+          prod_code,
+        ]);
+      } else {
+        // 수정 상세
+        await query("updateOrderDetail", [
+          unit,
+          spec,
+          ord_amount,
+          prod_price,
+          delivery_date,
+          ord_priority,
+          total_price,
+          prod_code,
+          ord_d_code,
+        ]);
+      }
     }
 
-    // 트랜잭션 커밋
+    // ------------------------------
+    // 4. 커밋
+    // ------------------------------
     await conn.commit();
 
-    return { ord_code };
+    return { ord_code: new_ord_code };
   } catch (err) {
-    // 오류 발생 시 롤백
     await conn.rollback();
-    // 콘솔 에러 메시지 수정
-    console.error("[orderService.js || 주문 정보 저장 실패]", err.message);
+    console.error("[orderService.js || 주문 정보 저장 실패]", err);
     throw err;
   } finally {
     conn.release();
