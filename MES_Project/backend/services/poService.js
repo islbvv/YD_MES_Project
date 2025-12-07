@@ -31,33 +31,52 @@ async function getPoByCode(purchaseCode) {
 // 발주 저장 (신규/수정 공통)
 async function savePo(poDto) {
   const conn = await getConnection();
+
   try {
     await conn.beginTransaction();
 
     const { header, items } = poDto;
-    let { purchase_code, purchase_req_date, stat, regdate, note, mcode } =
-      header;
+    if (!header) {
+      throw new Error("header 데이터가 없습니다.");
+    }
 
-    stat = stat || "요청완료";
-    regdate = regdate || new Date().toISOString().split("T")[0];
+    let {
+      purchase_code,
+      purchase_req_date,
+      stat,
+      regdate,
+      note,
+      mcode,
+      mpr_code,
+    } = header;
 
-    // 1) purchase_code 없으면 새 번호 생성
-    if (!purchase_code) {
+    const today = new Date().toISOString().split("T")[0];
+
+    // 기본값 처리
+    stat = stat || "c1";
+    regdate = regdate || today;
+    purchase_req_date = purchase_req_date || today;
+
+    const isNew = !purchase_code;
+
+    if (isNew) {
       const rows = await conn.query(
         `
-    SELECT IFNULL(
-             MAX(CAST(SUBSTRING(purchase_code, 3) AS UNSIGNED)),
-             0
-           ) AS max_seq
-    FROM mpo_tbl
-    WHERE purchase_code LIKE 'BJ%'
-    `
+        SELECT
+          CONCAT(
+            'BJ',
+            LPAD(
+              IFNULL(MAX(CAST(SUBSTRING(purchase_code, 3) AS UNSIGNED)), 0) + 1,
+              4,
+              '0'
+            )
+          ) AS next_code
+        FROM mpo_tbl
+        WHERE purchase_code LIKE 'BJ%';
+        `
       );
 
-      const nextSeq = (rows[0]?.max_seq || 0) + 1;
-
-      // BJ + 4자리 패딩
-      purchase_code = "BJ" + String(nextSeq).padStart(4, "0");
+      purchase_code = rows[0]?.next_code || "BJ0001";
 
       // 헤더 INSERT
       await conn.query(sqlList.insertPoHeader, [
@@ -68,8 +87,33 @@ async function savePo(poDto) {
         note || null,
         mcode,
       ]);
+
+      if (mpr_code) {
+        const mapRows = await conn.query(
+          `
+          SELECT
+            CONCAT(
+              'MAP',
+              LPAD(
+                IFNULL(MAX(CAST(SUBSTRING(mapp_code, 4) AS UNSIGNED)), 0) + 1,
+                4,
+                '0'
+              )
+            ) AS next_code
+          FROM mpr_mapp_tbl
+          WHERE mapp_code LIKE 'MAP%';
+          `
+        );
+
+        const mapp_code = mapRows[0]?.next_code || "MAP0001";
+
+        await conn.query(sqlList.insertMprMap, [
+          mapp_code, // mapp_code
+          mpr_code, // mpr_code
+          purchase_code, // purchase_code
+        ]);
+      }
     } else {
-      // 수정 모드라면 UPDATE + 상세 삭제
       await conn.query(sqlList.updatePoHeader, [
         stat,
         regdate,
@@ -77,40 +121,71 @@ async function savePo(poDto) {
         mcode,
         purchase_code,
       ]);
+
       await conn.query(sqlList.deletePoDetailsByCode, [purchase_code]);
     }
 
-    // 2) 상세 코드(mpo_d_code)도 직접 채우기
     const dRows = await conn.query(
       `
-  SELECT IFNULL(
-           MAX(CAST(SUBSTRING(mpo_d_code, 4) AS UNSIGNED)),
-           0
-         ) AS max_seq
+  SELECT COUNT(*) AS cnt
   FROM mpo_d_tbl
-  WHERE mpo_d_code LIKE 'BJd%'
+  WHERE mpo_d_code LIKE 'BJd%';
   `
     );
-    let nextDetailSeq = (dRows[0]?.max_seq || 0) + 1;
 
-    if (Array.isArray(items)) {
+    let nextDetailSeq = dRows[0]?.cnt || 0;
+
+    if (Array.isArray(items) && items.length) {
       for (const item of items) {
-        // 완전 빈 줄은 건너뛰기
-        if (!item.unit && !item.needQty && !item.dueDate && !item.vendor) {
-          continue;
+        const hasValue =
+          item.unit ||
+          item.needQty ||
+          item.req_qtt ||
+          item.dueDate ||
+          item.vendorCode ||
+          item.vendor ||
+          item.code ||
+          item.mat_code;
+
+        if (!hasValue) continue;
+
+        nextDetailSeq += 1;
+        const detailCode = "BJd" + String(nextDetailSeq).padStart(4, "0");
+
+        const unit = item.unit || null;
+
+        const needQty =
+          item.needQty !== undefined &&
+          item.needQty !== null &&
+          item.needQty !== ""
+            ? Number(item.needQty)
+            : item.req_qtt !== undefined &&
+              item.req_qtt !== null &&
+              item.req_qtt !== ""
+            ? Number(item.req_qtt)
+            : 0;
+
+        const deadline = item.dueDate || today;
+
+        let clientCode = item.vendorCode || item.client_code || null;
+        if (!clientCode) {
+          if (item.vendor && /^[A-Z]+-\d+$/.test(item.vendor)) {
+            clientCode = item.vendor;
+          } else {
+            clientCode = "CLIENT-001";
+          }
         }
 
-        const today = new Date().toISOString().split("T")[0];
-        const detailCode = "BJd" + String(nextDetailSeq++).padStart(4, "0");
+        const matCode = item.code || item.mat_code || "MAT-0001";
 
         await conn.query(sqlList.insertPoDetail, [
-          detailCode,
-          item.unit, // unit
-          item.needQty || item.req_qtt || 0, // req_qtt
-          item.dueDate || today, // deadline
-          purchase_code, // fk
-          item.vendor || "CLIENT-001", // client_code
-          item.code || "MAT-0001", // mat_code
+          detailCode, // mpo_d_code
+          unit, // unit
+          needQty, // req_qtt
+          deadline, // deadline
+          purchase_code, // FK
+          clientCode, // client_code
+          matCode, // mat_code
         ]);
       }
     }
@@ -174,7 +249,10 @@ async function deletePo(purchaseCode) {
     // 1. 상세 먼저 삭제
     await conn.query(sqlList.deletePoDetailsByCode, [purchaseCode]);
 
-    // 2. 헤더 삭제
+    // 2. 매핑 테이블 삭제 (mpr_mapp_tbl)
+    await conn.query(sqlList.deleteMprMappByPurchaseCode, [purchaseCode]);
+
+    // 3. 헤더 삭제
     await conn.query(sqlList.deletePoHeaderByCode, [purchaseCode]);
 
     await conn.commit();
@@ -214,15 +292,15 @@ async function getNextReqCode() {
   const conn = await getConnection();
   try {
     const rows = await conn.query(
-      "SELECT IFNULL(MAX(mpr_code), 'PRQ0000') AS max_code FROM mpr_tbl"
+      `SELECT IFNULL(MAX(mpr_code), 'PRQ0000') AS max_code
+   FROM mpr_tbl
+   WHERE mpr_code LIKE 'PRQ%'`
     );
     const maxCode = rows[0]?.max_code || "PRQ0000";
 
-    // 'PRQ0007' → 7
-    const num = parseInt(maxCode.replace(/^PRQ/, ""), 10) || 0;
-    const nextNum = num + 1;
+    const num = parseInt(maxCode.substring(3), 10) || 0;
 
-    const nextCode = "PRQ" + String(nextNum).padStart(4, "0"); // PRQ0001
+    const nextCode = "PRQ" + String(num + 1).padStart(4, "0");
 
     return nextCode;
   } finally {
@@ -276,12 +354,15 @@ async function saveMpr(mprDto) {
     ]);
 
     const rows = await conn.query(
-      "SELECT IFNULL(MAX(mpr_d_code), 'PRQd0000') AS max_code FROM mpr_d_tbl"
+      `SELECT IFNULL(MAX(mpr_d_code), 'PRQd0000') AS max_code
+     FROM mpr_d_tbl
+     WHERE mpr_d_code LIKE 'PRQd%'`
     );
     const maxCode = rows[0]?.max_code || "PRQd0000";
 
-    let num = parseInt(maxCode.replace(/^PRQd/, ""), 10) || 0;
+    const num = parseInt(maxCode.substring(4), 10) || 0;
 
+    let nextNum = num;
     // 상세 저장
     if (Array.isArray(items)) {
       for (const item of items) {
@@ -296,8 +377,8 @@ async function saveMpr(mprDto) {
           continue;
         }
 
-        num += 1;
-        const detailCode = "PRQd" + String(num).padStart(4, "0"); // PRQd0001
+        nextNum += 1;
+        const detailCode = "PRQd" + String(nextNum).padStart(4, "0");
 
         const req_qtt = item.req_qtt ? Number(item.req_qtt) : 0;
         const unit = item.unit || null;
@@ -398,6 +479,35 @@ async function getClientList(keyword) {
   }
 }
 
+async function getMprRequestItemList() {
+  const conn = await getConnection();
+  try {
+    const rows = await conn.query(sqlList.getMprRequestItemList);
+    return rows;
+  } finally {
+    conn.release();
+  }
+}
+// 요청 상세 헤더
+async function getMprDetailHeader(mprCode) {
+  const conn = await getConnection();
+  try {
+    const rows = await conn.query(sqlList.selectMprDetailHeader, [mprCode]);
+    return rows[0] || null;
+  } finally {
+    conn.release();
+  }
+}
+// 요청상세 아이템
+async function getMprDetailItems(mprCode) {
+  const conn = await getConnection();
+  try {
+    const rows = await conn.query(sqlList.selectMprDetailItems, [mprCode]);
+    return rows;
+  } finally {
+    conn.release();
+  }
+}
 module.exports = {
   getPoByCode,
   savePo,
@@ -411,4 +521,7 @@ module.exports = {
   getMprList,
   getMprByCode,
   getClientList,
+  getMprRequestItemList,
+  getMprDetailHeader,
+  getMprDetailItems,
 };
