@@ -78,6 +78,17 @@ router.post("/qio", async (req, res, next) => {
   }
 });
 
+// 7. PUT /api/quality/qio - 기존 qio_tbl 데이터 갱신
+router.put("/qio", async (req, res, next) => {
+  const reqData = req.body;
+  try {
+    const orders = await qualityService.updateQuailityInstructionOrder(reqData);
+    res.json({ code: "Q200", data: orders });
+  } catch (err) {
+    next(err); // 에러를 전역 오류 처리 미들웨어로 전달
+  }
+});
+
 // POST /api/productions/:planId/mrp - 특정 생산 계획으로 MRP 계산
 // router.post("/:planId/mrp", async (req, res, next) => {
 //   try {

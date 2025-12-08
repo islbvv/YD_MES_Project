@@ -124,7 +124,9 @@ where qir.qio_code =  ?
 `,
   createQuailityInstructionOrder: `
   INSERT INTO qio_tbl (qio_code, qio_date, insp_date, prdr_code, mpr_d_code, emp_code, insp_vol) 
-VALUES (NULL,  CURDATE()
+VALUES (
+?  -- PK 생성해서 넣어줌
+, CURDATE()
 , ? -- 검사 지시 일자 NotNull
 , ? -- 생산실적 코드 NullAble
 , ? -- 발주서 코드 NullAble - 생산실적과 발주서 중 둘중 하나만 FK있어야 함.
@@ -133,7 +135,7 @@ VALUES (NULL,  CURDATE()
 )`,
   createQuailityInstructionResult: `
   INSERT INTO qir_tbl (qir_code, start_date, end_date, result, note, qio_code, qir_emp_code, qcr_code, mpr_d_code) 
-  VALUES (NULL -- qir_code DB에 트리거 만들어서 자동으로 입력됨
+  VALUES (? -- qir_code 애플리케이션에서 생성
   , ? -- 검사 시작일 - 검사 지시 일자 값으로 초기값 주면됨
   , ? -- 검사 종료일 - 검사 지시 일자 값으로 초기값 주면됨
   , 'g0' -- 검사결과 인데 notNull로만들어놔서 검사전 상태를 의미하는 g0을 임의로 추가함.
@@ -143,4 +145,27 @@ VALUES (NULL,  CURDATE()
   , ? -- qcr_code - 검사 항목 상세정보의 기준이 되는 값을 저장하고있는 테이블의 PK
   , null -- 이거 넣어야됨? 넣을수는있는데 왜 mrp_d code만있고 prdr code는없음?
   )`,
+  updateQuailityInstructionOrder: `
+  UPDATE qio_tbl
+  SET
+    insp_date = ?,
+    prdr_code = ?,
+    mpr_d_code = ?,
+    emp_code = ?,
+    insp_vol = ?
+  WHERE qio_code = ?
+  `,
+  updateQuailityInstructionResult: `
+  UPDATE qir_tbl
+  SET
+    start_date = ?,
+    end_date = ?,
+    result = ?,
+    note = ?,
+    qir_emp_code = ?
+  WHERE qir_code = ?
+  `,
+  deleteQuailityInstructionResultsByQIO: `
+  DELETE FROM qir_tbl WHERE qio_code = ?
+  `,
 };

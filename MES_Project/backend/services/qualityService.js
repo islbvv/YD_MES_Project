@@ -149,6 +149,7 @@ exports.getQIODetail = async (qio_code, prdr_code, mpr_d_code) => {
   }
 };
 
+// 6. 품질검사 지시 생성
 exports.createQuailityInstructionOrder = async (data) => {
   // 1. 프론트엔드에서 받은 데이터 분해 할당
   const { insp_date, prdr_code, mpr_d_code, emp_code, insp_vol, qcr_codes } =
@@ -158,29 +159,71 @@ exports.createQuailityInstructionOrder = async (data) => {
   try {
     await conn.beginTransaction();
 
-    // 2. qio_tbl에 데이터 추가
+    // 2. 새로운 qio_code를 생성하고 가져온다. (SELECT ... FOR UPDATE 사용)
+    // 서브쿼리를 사용하여, 조건에 맞는 데이터가 없을 때도 항상 1개의 row를 반환하도록 보장
+    const getNewQioCodeSql = `
+      SELECT CONCAT(
+          'QIO-',
+          DATE_FORMAT(?, '%Y%m%d'),
+          '-',
+          LPAD(
+              IFNULL((SELECT MAX(SUBSTR(qio_code, -3))
+                      FROM qio_tbl
+                      WHERE SUBSTR(qio_code, 5, 8) = DATE_FORMAT(?, '%Y%m%d')
+                      FOR UPDATE), 0) + 1,
+              3, '0'
+          )
+      ) as new_qio_code;
+    `;
+    
+    // conn.query가 row의 배열을 반환
+    const rows = await conn.query(getNewQioCodeSql, [insp_date, insp_date]);
+
+    // 배열의 첫번째 요소를 안전하게 확인하고 qio_code를 추출
+    if (!rows || rows.length === 0) {
+      throw new Error("PK 생성 쿼리가 결과를 반환하지 않았습니다.");
+    }
+    const qio_code = rows[0].new_qio_code;
+
+    // 3. 생성된 qio_code를 사용하여 qio_tbl에 데이터 추가
     await conn.query(sqlList.createQuailityInstructionOrder, [
+      qio_code, // 생성된 PK
       insp_date,
       prdr_code,
       mpr_d_code,
       emp_code,
       insp_vol,
     ]);
-    const rows = await conn.query(
-      `SELECT qio_code FROM qio_tbl WHERE qio_code = LAST_INSERT_ID()`,
-      []
-    );
-    //QIO-DEFAULT-TEMP
-    const qio_code = rows[0].qio_code; // ex) 'QIO-20251208-002'
 
     // 4. qir_tbl에 qcr_codes 배열을 순회하며 데이터 추가
     for (const item of qcr_codes) {
+      // 4-1. 각 항목에 대한 qir_code 생성
+      const getNewQirCodeSql = `
+        SELECT CONCAT(
+            'QIR-',
+            LPAD(
+                IFNULL(
+                    (SELECT MAX(CAST(SUBSTR(qir_code, 5) AS UNSIGNED)) FROM qir_tbl FOR UPDATE),
+                    0
+                ) + 1,
+                3, '0'
+            )
+        ) as new_qir_code;
+      `;
+      const qirRows = await conn.query(getNewQirCodeSql);
+      if (!qirRows || qirRows.length === 0) {
+        throw new Error("QIR PK 생성 쿼리가 결과를 반환하지 않았습니다.");
+      }
+      const qir_code = qirRows[0].new_qir_code;
+
+      // 4-2. 생성된 qir_code와 함께 데이터 추가
       await conn.query(sqlList.createQuailityInstructionResult, [
-        insp_date, // insp_result_date (검사 결과일) - 초기에는 지시일자와 동일하게 설정
-        insp_date, // insp_date (검사일) - 초기에는 지시일자와 동일하게 설정
-        qio_code, // FK
-        emp_code, // FK
-        item, // qcr_code (FK)
+        qir_code,   // 새로 생성된 QIR PK
+        insp_date,  // start_date (검사 시작일)
+        insp_date,  // end_date (검사 종료일)
+        qio_code,   // FK
+        emp_code,   // qir_emp_code (검사 담당자)
+        item,       // qcr_code (FK)
       ]);
     }
 
@@ -194,3 +237,68 @@ exports.createQuailityInstructionOrder = async (data) => {
     conn.release();
   }
 };
+
+// 7. 품질검사 지시 수정
+exports.updateQuailityInstructionOrder = async (data) => {
+  // 1. 프론트엔드에서 받은 데이터 분해 할당
+  const { qio_code, insp_date, prdr_code, mpr_d_code, emp_code, insp_vol, qcr_codes } = data;
+
+  const conn = await getConnection(); // 트랜잭션용 연결
+  try {
+    await conn.beginTransaction();
+
+    // 2. 기존의 qir_tbl 상세 데이터들을 삭제
+    await conn.query(sqlList.deleteQuailityInstructionResultsByQIO, [qio_code]);
+
+    // 3. qio_tbl 마스터 데이터를 업데이트
+    await conn.query(sqlList.updateQuailityInstructionOrder, [
+      insp_date,
+      prdr_code,
+      mpr_d_code,
+      emp_code,
+      insp_vol,
+      qio_code, // WHERE 절에 들어갈 PK
+    ]);
+
+    // 4. 새로운 qcr_codes 배열을 순회하며 qir_tbl에 데이터 추가 (create 로직 재사용)
+    for (const item of qcr_codes) {
+      // 4-1. 각 항목에 대한 새로운 qir_code 생성
+      const getNewQirCodeSql = `
+        SELECT CONCAT(
+            'QIR-',
+            LPAD(
+                IFNULL(
+                    (SELECT MAX(CAST(SUBSTR(qir_code, 5) AS UNSIGNED)) FROM qir_tbl FOR UPDATE),
+                    0
+                ) + 1,
+                3, '0'
+            )
+        ) as new_qir_code;
+      `;
+      const qirRows = await conn.query(getNewQirCodeSql);
+      if (!qirRows || qirRows.length === 0) {
+        throw new Error("QIR PK 생성 쿼리가 결과를 반환하지 않았습니다.");
+      }
+      const qir_code = qirRows[0].new_qir_code;
+
+      // 4-2. 생성된 qir_code와 함께 데이터 추가
+      await conn.query(sqlList.createQuailityInstructionResult, [
+        qir_code,   // 새로 생성된 QIR PK
+        insp_date,  // start_date (검사 시작일)
+        insp_date,  // end_date (검사 종료일)
+        qio_code,   // FK
+        emp_code,   // qir_emp_code (검사 담당자)
+        item,       // qcr_code (FK)
+      ]);
+    }
+
+    await conn.commit(); // 모든 쿼리가 성공하면 트랜잭션 커밋
+    return { qio_code }; // 수정된 qio_code를 프론트엔드로 반환
+  } catch (err) {
+    await conn.rollback(); // 오류 발생 시 롤백
+    console.error("품질검사지시 수정 중 오류:", err);
+    throw new Error("품질검사지시 수정 중 오류가 발생했습니다.");
+  } finally {
+    conn.release();
+  }
+}

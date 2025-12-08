@@ -84,7 +84,7 @@ const handleModalConfirm = async (selectedItem) => {
         formState.value.qio_code = selectedItem.qio_code;
         formState.value.insp_date = selectedItem.insp_date;
         formState.value.emp_name = selectedItem.emp_name;
-        formState.value.emp_code = ''; // 불러오기 시에는 코드가 없으므로 초기화
+        formState.value.emp_code = selectedItem.emp_code; // 올바른 emp_code를 할당하도록 수정
         isInstructorReadOnly.value = true; // 지시자 필드를 읽기 전용으로 설정
 
         const { qio_code, prdr_code, mpr_d_code } = selectedItem;
@@ -206,7 +206,7 @@ const seveQualityInspectionOrder = async () => {
         return;
     }
 
-    if (!formState.value.emp_code) {
+    if (!formState.value.emp_code && !isInstructorReadOnly.value) {
         alert('지시자를 선택해주세요.');
         return;
     }
@@ -216,16 +216,39 @@ const seveQualityInspectionOrder = async () => {
         return;
     }
 
-    if (!formState.value.qio_code) {
-        const saveData = {
-            insp_date: formState.value.insp_date, // ✅
-            emp_code: formState.value.emp_code, // ✅ Dropdown에서 선택된 emp_code 사용
-            insp_vol: formState.value.item_quantity, // ✅
-            prdr_code: formState.value.target_type === '제품' ? formState.value.item_code : null, // ✅ 조건부
-            mpr_d_code: formState.value.target_type === '자재' ? formState.value.item_code : null, // ✅ 조건부
-            qcr_codes: selectedProducts.value.map((item) => item.qcr_code) // ✅ 배열
-        };
-        formState.value.qio_code = await qualityStore.saveQIO(saveData); // Pinia 스토어의 saveQIO 액션 호출
+    // 저장할 데이터 공통 구성
+    const saveData = {
+        insp_date: formState.value.insp_date,
+        emp_code: formState.value.emp_code,
+        insp_vol: formState.value.item_quantity,
+        prdr_code: formState.value.target_type === '제품' ? formState.value.item_code : null,
+        mpr_d_code: formState.value.target_type === '자재' ? formState.value.item_code : null,
+        qcr_codes: selectedProducts.value.map((item) => item.qcr_code)
+    };
+
+    // [DEBUG] 백엔드로 전송될 데이터 확인
+    console.log('백엔드로 전송될 데이터:', saveData);
+
+    try {
+        if (!formState.value.qio_code) {
+            // 생성 로직
+            const newQioCode = await qualityStore.saveQIO(saveData);
+            formState.value.qio_code = newQioCode;
+            alert('성공적으로 저장되었습니다.');
+        } else {
+            // 수정 로직
+            saveData.qio_code = formState.value.qio_code;
+            await qualityStore.saveQIO(saveData);
+            alert('성공적으로 수정되었습니다.');
+            resetForm(); // 수정 성공 후 폼 초기화
+
+            // 수정하고 수정사항 반영해서 목록 갱신
+            await qualityStore.fetchMpr_dList();
+            await qualityStore.fetchPrdrList();
+        }
+    } catch (error) {
+        console.error('저장/수정 중 오류 발생:', error);
+        alert('작업 중 오류가 발생했습니다.');
     }
 };
 </script>

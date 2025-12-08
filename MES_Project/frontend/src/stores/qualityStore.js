@@ -163,21 +163,19 @@ export const useQualityStore = defineStore('quality', {
 
         /**
          * 기존 품질검사기준(QCR)을 수정합니다. (PUT)
-         * @param {object} qcrToUpdate - 수정할 QCR 데이터 객체 (qcr_code 포함)
+         * @param {object} saveQIO - 수정할 QCR 데이터 객체 (qcr_code 포함)
          */
-        async updateQCR(qcrToUpdate) {
+        async updateQIO(saveQIO) {
             this.loading = true;
             this.error = null;
             try {
-                const response = await axios.put(`/api/quality/qcrs/${qcrToUpdate.qcr_code}`, qcrToUpdate);
-                // 성공 시, qcrList에서 해당 항목을 찾아 업데이트합니다.
-                const index = this.qcrList.findIndex((q) => q.qcr_code === qcrToUpdate.qcr_code);
-                if (index !== -1) {
-                    this.qcrList[index] = response.data.data;
-                }
+                const response = await axios.put('/api/quality/qio', saveQIO);
+                // 성공적으로 수정된 후, 목록을 다시 불러와서 화면에 최신 데이터를 반영합니다.
+                await this.fetchQIOList();
+                return response;
             } catch (error) {
                 this.error = '데이터 수정에 실패했습니다.';
-                console.error('Error updating QCR:', error);
+                console.error('Error updating QIO:', error);
                 throw error;
             } finally {
                 this.loading = false;
