@@ -59,14 +59,28 @@ const openSearch = (type) => {
             { field: 'empName', header: '성명' },
             { field: 'deptName', header: '부서' }
         ];
+    } else if (type === 'ORDER') {
+        modalConfig.value.title = '발주정보 불러오기';
+        // [수정] API 응답 데이터 구조에 맞춰 실제 데이터 배열을 반환하도록 수정
+        modalConfig.value.api = async () => {
+            const response = await inboundApi.getOrderList();
+            const formattedData = (response.data.data || []).map((row) => ({
+                ...row,
+                purchaseDate: row.purchaseDate ? String(row.purchaseDate).slice(0, 10) : ''
+            }));
+            return { data: formattedData };
+        };
+        modalConfig.value.columns = [
+            { field: 'purchaseCode', header: '발주서 번호' },
+            { field: 'purchaseDate', header: '발주제안일' },
+            { field: 'matName', header: '자재명' }
+        ];
     }
     isModalVisible.value = true;
 };
 
 // 모달에서 데이터 선택 시 폼에 반영
-const handleSelect = (data) => {
-    console.log('test:', data);
-
+const handleSelect = async (data) => {
     const type = modalConfig.value.targetType;
 
     if (type === 'MAT') {
@@ -80,7 +94,46 @@ const handleSelect = (data) => {
     } else if (type === 'EMP') {
         form.value.managerCode = data.empCode;
         form.value.manager = data.empName;
+    } else if (type === 'ORDER') {
+        if (!data.purchaseCode) return;
+        try {
+            // 2단계: 상세 정보 조회
+            const response = await inboundApi.getOrderDetail(data.purchaseCode);
+            const detailData = response.data.data;
+            const items = detailData.items || [];
+
+            if (items.length === 0) {
+                toast.add({ severity: 'info', summary: '알림', detail: '해당 발주서에 포함된 자재가 없습니다.', life: 3000 });
+                // [수정] 모달을 닫기 위해 return 전에 isModalVisible을 false로 설정
+                isModalVisible.value = false;
+                return;
+            }
+
+            // 3단계: 조회된 자재들을 입고 대기 목록에 추가
+            const today = new Date().toISOString().split('T')[0];
+            items.forEach((item) => {
+                inboundList.value.push({
+                    matCode: item.mat_code,
+                    matName: item.matName,
+                    category: item.matType,
+                    unit: item.unit,
+                    client: item.clientCode,
+                    clientName: item.clientName,
+                    manager: '', // 발주 정보에 담당자가 없으므로 빈 값으로 설정
+                    managerName: '',
+                    inQty: item.req_qtt, // 발주 필요수량을 입고 수량으로 설정
+                    inboundDate: today // 입고일자는 오늘 날짜로 기본 설정
+                });
+            });
+
+            toast.add({ severity: 'success', summary: '추가 완료', detail: `발주서 [${data.purchaseCode}]의 ${items.length}개 품목이 목록에 추가되었습니다.`, life: 4000 });
+        } catch (error) {
+            console.error('발주 상세 정보 조회 실패:', error);
+            toast.add({ severity: 'error', summary: '오류', detail: '발주 상세 정보를 불러오는 중 문제가 발생했습니다.', life: 3000 });
+        }
     }
+    // [수정] 모든 선택 처리가 끝난 후 모달을 닫음
+    isModalVisible.value = false;
 };
 // [기능] 목록에 추가
 const addToList = () => {
@@ -245,6 +298,7 @@ const cancelRegistration = () => {
                     <i class="pi pi-list mr-2 text-primary"></i>입고 대기 목록
                     <span class="ml-2 text-sm font-normal text-gray-500">(총 {{ inboundList.length }}건)</span>
                 </h3>
+                <button class="btn-green-custom" @click="openSearch('ORDER')">발주정보 불러오기</button>
             </div>
 
             <DataTable :value="inboundList" showGridlines stripedRows responsiveLayout="scroll" class="text-sm" removableSort scrollable scrollHeight="100px">
@@ -274,7 +328,7 @@ const cancelRegistration = () => {
             </DataTable>
 
             <div class="final-actions center-actions">
-                <Button label="등록" icon="pi pi-check" severity="success" class="mr-2 px-5" @click="submitRegistration" />
+                <Button label="등록" icon="pi pi-check" severity="info" class="mr-2 px-5" @click="submitRegistration" />
                 <Button label="취소" icon="pi pi-times" severity="secondary" class="px-5" @click="cancelRegistration" />
             </div>
         </div>
@@ -420,6 +474,16 @@ const cancelRegistration = () => {
 :deep(.p-datatable-tbody > tr > td) {
     padding-top: 0.4rem;
     padding-bottom: 0.4rem;
+}
+
+/* [수정] btn-green-custom 스타일 */
+.btn-green-custom {
+    background: #4ecb79;
+    color: white;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
 }
 </style>
 
