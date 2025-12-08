@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, watch, defineProps, defineEmits } from 'vue';
+import { reactive, watch, ref, defineProps, defineEmits } from 'vue';
+import ProductSelectModal from '@/components/order/ProductSelectModal.vue';
 
 const emit = defineEmits(['update:workOrderData']);
 
@@ -12,9 +13,9 @@ const props = defineProps({
             instructionQuantity: '',
             startDate: '',
             expectedCompletion: '',
-            instructionStatus: '',
+            instructionStatus: 'v4', // 💡 초기 상태를 '작업대기' (v4)로 설정
             lineType: '',
-            lineCode: ''
+            lineCode: '' // 생산 계획 번호로 사용될 가능성이 높음
         })
     },
     labels: {
@@ -27,7 +28,7 @@ const props = defineProps({
             expectedCompletion: '예상 완료일시',
             instructionStatus: '지시 상태',
             lineType: '라인 유형',
-            lineCode: '라인 코드'
+            lineCode: '라인 코드' // 이 필드를 생산 계획 번호로 간주
         })
     },
     statusOptions: {
@@ -36,7 +37,7 @@ const props = defineProps({
             { label: '진행중', value: 'v1' },
             { label: '작업완료', value: 'v2' },
             { label: '작업보류', value: 'v3' },
-            { label: '작업대기', value: 'v4' }
+            { label: '작업대기', value: 'v4' } // 💡 '작업대기'의 value를 'v4'로 가정합니다.
         ]
     }
 });
@@ -44,22 +45,53 @@ const props = defineProps({
 // 🔹 props를 내부 reactive로 복사 (v-model용)
 const localWorkOrder = reactive({ ...props.workOrderData });
 
-// 🔥 props 변경 시 localWorkOrder 즉시 업데이트 (deep watch + immediate)
+// 💡 모달 표시 상태 관리 및 핸들러 (이전과 동일)
+const showProductModal = ref(false);
+const openProductModal = () => {
+    showProductModal.value = true;
+};
+const handleProductSelect = (payload) => {
+    if (payload && payload.row) {
+        const selectedProduct = payload.row;
+        localWorkOrder.productName = selectedProduct.prod_name || '';
+        localWorkOrder.lineCode = selectedProduct.prod_code || '';
+    }
+    showProductModal.value = false;
+};
+
+// --- ✨ 추가/수정된 로직 ---
+
+// 1. 라인 코드 (생산 계획 번호) 변경 감시 및 라인 유형 업데이트
+watch(
+    () => localWorkOrder.lineCode,
+    (newLineCode) => {
+        // 라인 유형 ('정형'/'비정형') 업데이트
+        localWorkOrder.lineType = newLineCode ? '정형' : '비정형';
+
+        // 💡 2. 라인 코드 값 유무에 따라 지시 상태를 '작업대기' (v4)로 설정
+        //     단, 이미 '진행중' 등 다른 상태라면 덮어쓰지 않도록 조건 추가 (필요에 따라 조절)
+        if (!newLineCode) {
+            // 생산 계획 번호가 비어있다면, 강제로 '작업대기'로 설정
+            localWorkOrder.instructionStatus = 'v4';
+        }
+    },
+    { immediate: true }
+);
+
+// 🔥 props 변경 시 localWorkOrder 즉시 업데이트
 watch(
     () => props.workOrderData,
     (newVal) => {
-        console.log('🔥 WorkInstructions - props 변경 감지:', newVal);
-
-        // 🔥 Object.assign 대신 개별 속성 업데이트 (반응성 보장)
         localWorkOrder.productName = newVal.productName || '';
         localWorkOrder.instructionQuantity = newVal.instructionQuantity || '';
         localWorkOrder.startDate = newVal.startDate || '';
         localWorkOrder.expectedCompletion = newVal.expectedCompletion || '';
-        localWorkOrder.instructionStatus = newVal.instructionStatus || '';
-        localWorkOrder.lineType = newVal.lineType || (newVal.lineCode ? '정형' : '비정형');
-        localWorkOrder.lineCode = newVal.lineCode || '';
 
-        console.log('✅ localWorkOrder 업데이트 완료:', localWorkOrder);
+        // 지시 상태의 초기값 설정 (props에서 받은 값 우선, 없으면 '작업대기' (v4))
+        localWorkOrder.instructionStatus = newVal.instructionStatus || 'v4';
+
+        localWorkOrder.lineCode = newVal.lineCode || '';
+        localWorkOrder.lineType = newVal.lineType || (newVal.lineCode ? '정형' : '비정형');
     },
     { deep: true, immediate: true }
 );
@@ -81,15 +113,13 @@ watch(
         </div>
 
         <div class="form-grid grid grid-cols-2 bg-white border-t-4 border-red-500">
-            <!-- 제품명 -->
             <div class="grid-row border-b border-r border-gray-200">
                 <label class="label-col">{{ labels.productName }}</label>
                 <div class="input-col">
-                    <input type="text" v-model="localWorkOrder.productName" class="input-field-style-compact" />
+                    <input type="text" v-model="localWorkOrder.productName" @click="openProductModal" readonly class="input-field-style-compact product-select-field" />
                 </div>
             </div>
 
-            <!-- 지시수량 -->
             <div class="grid-row border-b border-gray-200">
                 <label class="label-col">{{ labels.instructionQuantity }}</label>
                 <div class="input-col">
@@ -98,7 +128,6 @@ watch(
                 </div>
             </div>
 
-            <!-- 작업 시작일시 -->
             <div class="grid-row border-b border-r border-gray-200">
                 <label class="label-col">{{ labels.startDate }}</label>
                 <div class="input-col">
@@ -106,7 +135,6 @@ watch(
                 </div>
             </div>
 
-            <!-- 예상 완료일시 -->
             <div class="grid-row border-b border-gray-200">
                 <label class="label-col">{{ labels.expectedCompletion }}</label>
                 <div class="input-col">
@@ -114,20 +142,13 @@ watch(
                 </div>
             </div>
 
-            <!-- 지시 상태 -->
             <div class="grid-row border-b border-r border-gray-200">
                 <label class="label-col">{{ labels.instructionStatus }}</label>
                 <div class="input-col">
-                    <select v-model="localWorkOrder.instructionStatus" class="input-field-style-compact select-field">
-                        <option value="">선택 안함</option>
-                        <option v-for="option in statusOptions" :key="option.value" :value="option.value">
-                            {{ option.label }}
-                        </option>
-                    </select>
+                    <input type="text" :value="statusOptions.find((opt) => opt.value === localWorkOrder.instructionStatus)?.label || '알 수 없음'" class="input-field-style-compact read-only-status" readonly />
                 </div>
             </div>
 
-            <!-- 라인 유형 -->
             <div class="grid-row border-b border-gray-200">
                 <label class="label-col">{{ labels.lineType }}</label>
                 <div class="input-col">
@@ -135,7 +156,6 @@ watch(
                 </div>
             </div>
 
-            <!-- 라인 코드 -->
             <div class="grid-row border-r border-gray-200">
                 <label class="label-col">{{ labels.lineCode }}</label>
                 <div class="input-col">
@@ -143,13 +163,14 @@ watch(
                 </div>
             </div>
 
-            <!-- 빈칸 유지 -->
             <div class="grid-row border-gray-200">
                 <label class="label-col bg-white"></label>
                 <div class="input-col bg-white"></div>
             </div>
         </div>
     </div>
+
+    <ProductSelectModal :model-value="showProductModal" @update:model-value="(val) => (showProductModal = val)" @select="handleProductSelect" />
 </template>
 
 <style scoped>
@@ -205,5 +226,17 @@ watch(
     background-repeat: no-repeat;
     background-position: right 8px center;
     padding-right: 25px !important;
+}
+.product-select-field {
+    cursor: pointer;
+    background-color: #f9f9f9;
+}
+.read-only-status {
+    cursor: default;
+    background-color: #f0f0f0; /* 읽기 전용임을 시각적으로 표현 */
+}
+.product-select-field {
+    cursor: pointer;
+    background-color: #f9f9f9;
 }
 </style>
