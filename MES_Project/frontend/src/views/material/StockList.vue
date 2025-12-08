@@ -87,16 +87,23 @@ const resetFilters = () => {
 // ------------------------------------------------------------------
 // [Helper]
 // ------------------------------------------------------------------
-// 날짜/시간 포맷팅 (YYYY-MM-DD HH:mm)
+// 텍스트 말줄임표 처리
+const truncateText = (text, maxLength) => {
+    if (!text) return '';
+    if (text.length > maxLength) {
+        return text.substring(0, maxLength) + '...';
+    }
+    return text;
+};
+
+// 날짜/시간 포맷팅 (YYYY-MM-DD)
 const formatDateTime = (isoString) => {
     if (!isoString) return '';
     const date = new Date(isoString);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}`;
+    return `${year}-${month}-${day}`;
 };
 
 const getStatusLabel = (status) => status;
@@ -155,9 +162,15 @@ onMounted(() => {
                         <div class="p-4 text-center text-gray-500">조회된 재고 목록이 없습니다.</div>
                     </template>
                     <Column field="code" header="자재코드" headerClass="center-header" bodyClass="text-center" />
-                    <Column field="name" header="자재명" headerClass="center-header" bodyClass="text-center" />
+                    <Column field="name" header="자재명" headerClass="center-header" bodyClass="text-center">
+                        <template #body="{ data }">
+                            {{ truncateText(data.name, 10) }}
+                        </template>
+                    </Column>
                     <Column field="category" header="분류" headerClass="center-header" bodyClass="text-center" />
-                    <Column field="stock" header="현재 재고" headerClass="center-header" bodyClass="text-center" />
+                    <Column field="stock" header="현재 재고" headerClass="center-header" bodyClass="text-center">
+                        <template #body="{ data }"> {{ truncateText(data.stock, 5) }} {{ data.unit }} </template>
+                    </Column>
                     <Column header="재고 상태" headerClass="center-header" bodyClass="text-center">
                         <template #body="{ data }">
                             <div class="status-chip justify-center">
@@ -182,11 +195,12 @@ onMounted(() => {
                         <div><span class="info-label">자재명:</span> {{ selected.name }}</div>
                         <div><span class="info-label">분류:</span> {{ selected.category }}</div>
                         <div><span class="info-label">단위:</span> {{ selected.unit }}</div>
+                        <div><span class="info-label">규격:</span> {{ selected.spec }}</div>
                     </div>
 
                     <h3 class="section-title border-green">재고 정보</h3>
                     <div class="info-grid text-sm mb-4">
-                        <div><span class="info-label">현재 재고:</span> {{ selected.stock }}</div>
+                        <div><span class="info-label">현재 재고:</span> {{ selected.stock }} {{ selected.unit }}</div>
                         <div><span class="info-label">안전 재고:</span> {{ selected.minStock }}</div>
                         <div class="flex-center">
                             <span class="info-label mr-1">재고 상태:</span>
@@ -201,7 +215,9 @@ onMounted(() => {
                     <h3 class="section-title border-yellow">상세 재고 (공급업체별)</h3>
                     <DataTable :value="selected.details" size="small" class="mb-4 text-sm" rowHover>
                         <Column field="supplier" header="공급업체" headerClass="center-header" bodyClass="text-center" />
-                        <Column field="amount" header="수량" headerClass="center-header" bodyClass="text-center" />
+                        <Column field="amount" header="수량" headerClass="center-header" bodyClass="text-center">
+                            <template #body="{ data }"> {{ data.amount }} {{ selected.unit }} </template>
+                        </Column>
                         <Column field="date" header="입고일" headerClass="center-header" bodyClass="text-center">
                             <template #body="{ data }">
                                 {{ formatDateTime(data.date) }}
@@ -218,7 +234,9 @@ onMounted(() => {
                             </template>
                         </Column>
                         <Column field="type" header="구분" headerClass="center-header" bodyClass="text-center" />
-                        <Column field="amount" header="수량" headerClass="center-header" bodyClass="text-center" />
+                        <Column field="amount" header="수량" headerClass="center-header" bodyClass="text-center">
+                            <template #body="{ data }"> {{ data.amount }} {{ selected.unit }} </template>
+                        </Column>
                         <Column field="supplier" header="공급업체" headerClass="center-header" bodyClass="text-center" />
                         <Column field="manager" header="담당자" headerClass="center-header" bodyClass="text-center" />
                     </DataTable>

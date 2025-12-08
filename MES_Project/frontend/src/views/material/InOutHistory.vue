@@ -102,6 +102,16 @@ const getStatusLabel = (status) => {
     return map[status] || status;
 };
 
+// 날짜 표시용 포맷팅 (YYYY-MM-DD)
+const formatDateDisplay = (isoString) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 // ------------------------------------------------------------------
 // [Lifecycle] 초기 데이터 로드
 // ------------------------------------------------------------------
@@ -206,7 +216,11 @@ onMounted(() => {
                     </template>
                 </Column>
 
-                <Column field="procDate" header="처리일자" sortable headerClass="center-header" bodyClass="text-center" style="width: 8rem"></Column>
+                <Column field="procDate" header="처리일자" sortable headerClass="center-header" bodyClass="text-center" style="width: 8rem">
+                    <template #body="{ data }">
+                        {{ formatDateDisplay(data.procDate) }}
+                    </template>
+                </Column>
                 <Column field="matCode" header="자재코드" sortable headerClass="center-header" bodyClass="text-center" style="width: 8rem"></Column>
                 <Column field="matName" header="자재명" sortable headerClass="center-header" bodyClass="text-center" style="width: 12rem"></Column>
 
