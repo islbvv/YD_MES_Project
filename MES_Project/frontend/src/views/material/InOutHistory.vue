@@ -94,7 +94,11 @@ const goToPage = (path) => {
 };
 
 const exportToExcel = () => {
-    if (!historyList.value || historyList.value.length === 0) {
+    // 내보낼 데이터 소스를 결정합니다. 선택된 항목이 있으면 그것을, 없으면 전체 목록을 사용합니다.
+    const sourceData = selectedHistory.value.length > 0 ? selectedHistory.value : historyList.value;
+
+    // 내보낼 데이터가 있는지 최종적으로 확인합니다.
+    if (!sourceData || sourceData.length === 0) {
         toast.add({ severity: 'warn', summary: '내보낼 데이터 없음', detail: '테이블에 데이터가 없습니다.', life: 3000 });
         return;
     }
@@ -105,7 +109,7 @@ const exportToExcel = () => {
     const day = String(today.getDate()).padStart(2, '0');
     const filename = `자재_입출고_내역_${year}${month}${day}.xlsx`;
 
-    const dataToExport = historyList.value.map((item) => ({
+    const dataToExport = sourceData.map((item) => ({
         구분: getHistoryTypeLabel(item.type),
         처리일자: formatDateDisplay(item.procDate),
         자재코드: item.matCode,
