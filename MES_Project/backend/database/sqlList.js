@@ -12,6 +12,7 @@ const inbound = require("./sqls/inbound.js");
 const process = require("./sqls/process.js");
 const quality = require("./sqls/quality.js");
 const dashboard = require("./sqls/dashboard.js");
+const addProd = require("./sqls/addProd.js");
 
 module.exports = {
   ...Productionwork,
@@ -26,4 +27,5 @@ module.exports = {
   ...quality,
   ...bom,
   ...dashboard,
+  ...addProd,
 };
