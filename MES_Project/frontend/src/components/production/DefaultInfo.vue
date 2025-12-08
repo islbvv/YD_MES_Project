@@ -165,6 +165,9 @@ const handleReset = () => {
     formData.value.workOrderNo = generateWorkOrderNo();
     formData.value.productionPlanNo = generateProductionPlanNo();
     formData.value.planDate = getToday();
+    otherDataStore.value = {};
+
+    emit('updateOtherData', {}); // 부모가 받는 값도 빈 객체로
 };
 
 // -------------------------------------
