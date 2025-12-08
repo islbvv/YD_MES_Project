@@ -35,7 +35,8 @@ const orderColumns = [
     { field: 'orderNo', label: '주문번호' },
     { field: 'orderDate', label: '주문일자' },
     { field: 'orderName', label: '주문명' },
-    { field: 'client', label: '거래처' }
+    { field: 'client', label: '거래처' },
+    { field: 'remainingQty', label: '미출고수량' }
 ];
 
 // 백엔드에서 채워질 주문 리스트
@@ -91,6 +92,15 @@ const releaseColumns = [
 const releaseRows = ref([]);
 const releaseKeyword = ref('');
 
+// 오늘 날짜 (YYYY-MM-DD) 포맷
+const getToday = () => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+};
+
 // 출고 목록 조회 API
 const fetchReleaseList = async (keyword = '') => {
     try {
@@ -143,7 +153,7 @@ const handleSearchRelease = (keyword) => {
 const basicInfo = reactive({
     releaseCode: '',
     orderCode: '',
-    releaseDate: '',
+    releaseDate: getToday(),
     orderDate: '',
     client: '',
     registrant: '', // 사원코드(emp_code)
@@ -434,7 +444,7 @@ const onDelete = async () => {
 const onReset = () => {
     basicInfo.releaseCode = '';
     basicInfo.orderCode = '';
-    basicInfo.releaseDate = '';
+    basicInfo.releaseDate = getToday();
     basicInfo.orderDate = '';
     basicInfo.client = '';
     // basicInfo.registrant 는 유지 (담당자는 계속 동일하게 쓸 수 있게)
@@ -506,6 +516,7 @@ const onSave = async () => {
     }
 };
 
+// 공통 코드 조회
 const fetchCommonCodes = async () => {
     try {
         const res = await axios.get('/api/release/fwd/codes');
@@ -589,22 +600,22 @@ const fetchCommonCodes = async () => {
                     <input v-model="basicInfo.orderCode" type="text" class="form-input" placeholder="주문코드" disabled />
                 </div>
 
-                <!-- 출고일자 -->
+                <!-- 출고요청일 -->
                 <div class="form-field col-2">
-                    <label class="form-label">출고일자</label>
-                    <input v-model="basicInfo.releaseDate" type="date" class="form-input" />
+                    <label class="form-label">출고요청일</label>
+                    <input v-model="basicInfo.releaseDate" type="date" class="form-input" disabled />
                 </div>
 
                 <!-- 주문일자 -->
                 <div class="form-field col-2">
                     <label class="form-label">주문일자</label>
-                    <input v-model="basicInfo.orderDate" type="date" class="form-input" />
+                    <input v-model="basicInfo.orderDate" type="date" class="form-input" disabled />
                 </div>
 
                 <!-- 거래처 -->
                 <div class="form-field col-2">
                     <label class="form-label">거래처</label>
-                    <input v-model="basicInfo.client" type="text" class="form-input" placeholder="거래처" />
+                    <input v-model="basicInfo.client" type="text" class="form-input" placeholder="거래처" disabled />
                 </div>
 
                 <!-- 등록자 (인풋 + 모달 오픈) -->

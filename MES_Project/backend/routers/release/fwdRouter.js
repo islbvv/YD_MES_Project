@@ -118,6 +118,7 @@ router.get("/check", async (req, res) => {
     const {
       releaseNo = "",
       productName = "",
+      productCode = "",
       qtyFrom = "",
       qtyTo = "",
       dateFrom = "",
@@ -129,6 +130,7 @@ router.get("/check", async (req, res) => {
     const rows = await fwdService.getForwardingCheckList({
       releaseNo,
       productName,
+      productCode,
       qtyFrom,
       qtyTo,
       dateFrom,
@@ -190,6 +192,20 @@ router.get("/products", async (req, res) => {
     return res.status(500).json({
       status: "error",
       message: "제품 목록 조회 중 오류가 발생했습니다.",
+    });
+  }
+});
+
+// 출고요청 목록 조회 (전체 – 출고조회 페이지 모달용)
+router.get("/all", async (req, res) => {
+  try {
+    const rows = await fwdService.getReleaseListAll(req.query);
+    return res.json({ status: "success", data: rows });
+  } catch (err) {
+    console.error("[Forwarding] 출고 목록(전체) 조회 실패:", err);
+    return res.status(500).json({
+      status: "error",
+      message: "출고 목록(전체) 조회 중 오류가 발생했습니다.",
     });
   }
 });
