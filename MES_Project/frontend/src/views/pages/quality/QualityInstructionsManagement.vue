@@ -12,8 +12,8 @@ const employeeManagerList = computed(() => qualityStore.getEmployeeManagers); //
 // 폼 데이터 상태 관리
 const formState = ref({
     qio_code: '', // 검사지시코드
-    order_date: '', // 지시일자
-    user_name: '', // 지시자
+    insp_date: '', // 지시일자
+    emp_name: '', // 지시자
     target_type: '', // 검사대상 (자재/제품)
     item_code: '', // 품목코드
     item_name: '', // 품목이름
@@ -42,8 +42,8 @@ const openModal = async (type) => {
         modalData.value = qualityStore.qioList;
         modalColumns.value = [
             { field: 'qio_code', header: '검사지시코드' },
-            { field: 'order_date', header: '지시일자' },
-            { field: 'user_name', header: '지시자' }
+            { field: 'insp_date', header: '지시일자' },
+            { field: 'emp_name', header: '지시자' }
         ];
         // TODO: dataKey prop 추가 필요
     } else if (type === 'stock') {
@@ -75,16 +75,42 @@ const openModal = async (type) => {
     }
     isModalVisible.value = true;
 };
-
 // 모달에서 데이터 선택 시 처리할 함수
-const handleModalConfirm = (selectedItem) => {
+const handleModalConfirm = async (selectedItem) => {
     if (!selectedItem) return;
-
+    console.log('나이거골랐어용 이거에용', selectedItem);
     if (modalType.value === 'inspection') {
         formState.value.qio_code = selectedItem.qio_code;
-        formState.value.order_date = selectedItem.order_date;
-        formState.value.user_name = selectedItem.user_name;
+        formState.value.insp_date = selectedItem.insp_date;
+        formState.value.emp_name = selectedItem.emp_name;
         isInstructorReadOnly.value = true; // 지시자 필드를 읽기 전용으로 설정
+
+        const { qio_code, prdr_code, mpr_d_code } = selectedItem;
+        await qualityStore.loadInspectionDetails({ qio_code, prdr_code, mpr_d_code });
+
+        if ((selectedItem.prdr_code != null && selectedItem.mpr_d_code == null) || (selectedItem.prdr_code == null && selectedItem.mpr_d_code != null)) {
+            if (selectedItem.mpr_d_code != null) {
+                formState.value.target_type = '자재';
+                formState.value.item_code = qualityStore.selectedQIO[0][0].mpr_d_code;
+                formState.value.item_name = qualityStore.selectedQIO[0][0].mat_name;
+                formState.value.item_quantity = qualityStore.selectedQIO[0][0].req_qtt;
+            } else if (selectedItem.prdr_code != null) {
+                formState.value.target_type = '제품';
+                formState.value.item_code = qualityStore.selectedQIO[0][0].prdr_code;
+                formState.value.item_name = qualityStore.selectedQIO[0][0].prod_name;
+                formState.value.item_quantity = qualityStore.selectedQIO[0][0].production_qtt;
+            }
+        }
+
+        selectedProducts.value = [];
+        qualityStore.selectedQIO[1].forEach((item) => {
+            selectedProducts.value.push({
+                inspection_item: item.inspection_item,
+                range_top: item.range_top,
+                range_bot: item.range_bot,
+                note: item.note
+            });
+        });
     } else if (modalType.value === 'stock') {
         formState.value.target_type = '자재';
         formState.value.item_code = selectedItem.mpr_d_code;
@@ -98,8 +124,25 @@ const handleModalConfirm = (selectedItem) => {
     }
 };
 
+// 화면 상태를 초기화하는 함수
+const resetForm = () => {
+    formState.value = {
+        qio_code: '',
+        insp_date: formatDate(new Date()), // 지시일자는 오늘 날짜로 설정
+        emp_name: '',
+        target_type: '',
+        item_code: '',
+        item_name: '',
+        item_quantity: null
+    };
+    // 지시자 필드 읽기 전용 상태 해제
+    isInstructorReadOnly.value = false;
+    // 데이터 테이블에서 선택된 항목들 초기화
+    selectedProducts.value = null;
+};
+
 // 선택된 행들을 저장할 반응형 변수
-const selectedProducts = ref();
+const selectedProducts = ref([]);
 
 // DataTable의 컬럼 정의
 const columns = [
@@ -149,8 +192,12 @@ onMounted(() => {
     // 스토어에 데이터가 없으면 fetchQCRList 액션을 호출. === if(!qualityStore.hasQCRData) { qualityStore.fetchQCRList(); }
     !qualityStore.hasQCRData && qualityStore.fetchQCRList();
     !qualityStore.hasEmployeeManager && qualityStore.fetchQualityEmployeeList();
-    formState.value.order_date = formatDate(new Date()); // 지시일자를 오늘 날짜로 설정
+    formState.value.insp_date = formatDate(new Date()); // 지시일자를 오늘 날짜로 설정
 });
+
+const seveQualityInspectionOrder = () => {
+    console.log('hello');
+};
 </script>
 
 <template>
@@ -159,10 +206,10 @@ onMounted(() => {
         <div class="flex justify-between items-center">
             <div class="font-semibold text-xl">기본정보</div>
             <div class="flex gap-2">
-                <Button label="삭제" :fluid="false"></Button>
-                <Button label="초기화" :fluid="false"></Button>
-                <Button label="저장" :fluid="false"></Button>
-                <Button label="검사지시 불러오기" @click="openModal('inspection')" :fluid="false"></Button>
+                <Button label="삭제"></Button>
+                <Button label="초기화" @click="resetForm"></Button>
+                <Button label="저장" @click="seveQualityInspectionOrder"></Button>
+                <Button label="검사지시 불러오기" @click="openModal('inspection')"></Button>
             </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -175,21 +222,21 @@ onMounted(() => {
             <div class="grid grid-cols-12 gap-2">
                 <label class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">지시일자</label>
                 <div class="col-span-12 md:col-span-8">
-                    <InputText type="text" v-model="formState.order_date" class="w-full" :readonly="true" />
+                    <InputText type="text" v-model="formState.insp_date" class="w-full" :readonly="true" />
                 </div>
             </div>
             <div class="grid grid-cols-12 gap-2">
                 <label class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">지시자</label>
                 <div class="col-span-12 md:col-span-8">
-                    <Dropdown v-model="formState.user_name" :options="employeeManagerList" optionLabel="emp_name" optionValue="emp_name" placeholder="지시자 선택" class="w-full" :disabled="isInstructorReadOnly" />
+                    <Dropdown v-model="formState.emp_name" :options="employeeManagerList" optionLabel="emp_name" optionValue="emp_name" placeholder="지시자 선택" class="w-full" :disabled="isInstructorReadOnly" />
                 </div>
             </div>
         </div>
         <div class="flex justify-between items-center mt-4">
             <div class="font-semibold text-xl">기본정보</div>
             <div class="flex gap-2">
-                <Button label="재고목록 불러오기" @click="openModal('stock')" :fluid="false"></Button>
-                <Button label="생산실적 불러오기" @click="openModal('production')" :fluid="false"></Button>
+                <Button label="재고목록 불러오기" @click="openModal('stock')"></Button>
+                <Button label="생산실적 불러오기" @click="openModal('production')"></Button>
             </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

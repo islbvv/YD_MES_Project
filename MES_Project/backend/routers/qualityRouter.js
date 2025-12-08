@@ -43,9 +43,24 @@ router.get("/es", async (req, res, next) => {
 });
 
 // 4. GET /api/quality/qio - qio_tbl목록 전체 조회
-router.get("/qio", async (req, res, next) => {
+router.get("/qios", async (req, res, next) => {
   try {
     const orders = await qualityService.getQIOList();
+    res.json({ code: "Q200", data: orders });
+  } catch (err) {
+    next(err); // 에러를 전역 오류 처리 미들웨어로 전달
+  }
+});
+
+// 4. GET /api/quality/qiodetail - qio_tbl단건을 기반으로 품질검사지시 상세 조회
+router.get("/qiodetail", async (req, res, next) => {
+  const { qio_code, prdr_code, mpr_d_code } = req.query;
+  try {
+    const orders = await qualityService.getQIODetail(
+      qio_code,
+      prdr_code,
+      mpr_d_code
+    );
     res.json({ code: "Q200", data: orders });
   } catch (err) {
     next(err); // 에러를 전역 오류 처리 미들웨어로 전달
