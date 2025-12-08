@@ -29,7 +29,7 @@ const formatDate = (dateString) => {
             <div class="grid-row border-b border-r">
                 <label class="label-col">공정명</label>
                 <div class="input-col">
-                    <input type="text" readonly class="input-readonly" :value="props.work?.process_type || ''" />
+                    <input type="text" readonly class="input-readonly" :value="props.work?.line ? '정형' : '비정형' || ''" />
                 </div>
             </div>
 

@@ -50,8 +50,9 @@ const totalSeconds = computed(() => {
 // prdrInsert 호출 (실적 등록)
 // NOTE: 실제로는 prdr_code, work_order_code, emp_code, prod_code, ord_qtt 를 모두 채워야 함
 const callPrdrInsert = async () => {
-    const prdr = await axios.post('/api/productionwork/work/prdrmax');
-    console.log(prdr.data);
+    const prdr = await axios.get('/api/productionwork/work/prdrmax');
+    const prdr_Value = JSON.parse(JSON.stringify(prdr.data.data.result[0]));
+    console.log(prdr_Value);
 
     // // 예시: 필요한 값은 상황에 맞게 수정
     // const payload = {
@@ -138,39 +139,39 @@ const completeCurrentProcess = async () => {
 };
 
 // 작업 시작 버튼
-const startWork = async () => {
-    if (!work.value) {
-        alert('작업 정보가 없습니다.');
-        return;
-    }
-    if (!details.value.length) {
-        alert('공정 정보가 없습니다.');
-        return;
-    }
-    if (!selectedEq.value) {
-        alert('사용할 설비를 선택해 주세요.');
-        return;
-    }
+// const startWork = async () => {
+//     if (!work.value) {
+//         alert('작업 정보가 없습니다.');
+//         return;
+//     }
+//     if (!details.value.length) {
+//         alert('공정 정보가 없습니다.');
+//         return;
+//     }
+//     if (!selectedEq.value) {
+//         alert('사용할 설비를 선택해 주세요.');
+//         return;
+//     }
 
-    if (isRunning.value) {
-        alert('이미 작업이 진행 중입니다.');
-        return;
-    }
+//     if (isRunning.value) {
+//         alert('이미 작업이 진행 중입니다.');
+//         return;
+//     }
 
-    workStartTime.value = new Date();
-    isFinishedAll.value = false;
-    currentProcessIndex.value = 0;
-    currentRate.value = 0;
+//     workStartTime.value = new Date();
+//     isFinishedAll.value = false;
+//     currentProcessIndex.value = 0;
+//     currentRate.value = 0;
 
-    // 1) 실적 등록
-    await callPrdrInsert();
+//     // 1) 실적 등록
+//     await callPrdrInsert();
 
-    // 2) 설비 상태: 사용 중 (w2)
-    await updateEquipmentStat('w2');
+//     // 2) 설비 상태: 사용 중 (w2)
+//     await updateEquipmentStat('w2');
 
-    // 3) 첫 공정 진행 시작
-    startRateTimer();
-};
+//     // 3) 첫 공정 진행 시작
+//     startRateTimer();
+// };
 
 // 작업 종료 버튼
 const endWork = async () => {
@@ -217,8 +218,8 @@ onBeforeUnmount(() => {
         <AvailableEquipment :selectedEq="selectedEq" @select-eq="handleSelectEquipment" />
 
         <div class="button-area">
-            <button class="btn btn-black">작업 종료</button>
-            <button class="btn btn-yellow">작업 시작</button>
+            <button class="btn btn-black" @click="endWork()">작업 종료</button>
+            <button class="btn btn-yellow" @click="callPrdrInsert()">작업 시작</button>
         </div>
     </div>
 </template>
