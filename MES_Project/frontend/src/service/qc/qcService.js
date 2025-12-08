@@ -2,6 +2,7 @@ import api from '../../api/qc/qcApi';
 
 export const qcService = {
     // 004
+    getSearchList: () => api.get(`/qc/list`),
     getQcList: (criteria) => api.post(`/qc/list`, criteria),
 
     // 005

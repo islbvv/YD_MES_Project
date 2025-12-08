@@ -15,10 +15,28 @@ export function useQcAppService() {
             }
         };
     }
+
     // 004
+    async function getSearchList() {
+        const result = await qcService.getSearchList();
+        store.modal.resultRows = result.data.map((item) => ({
+            qcrCode: item.qcrCode,
+            checkMethod: item.checkMethod
+        }));
+        return { ok: true };
+    }
+
+    function selectedQcrCode() {
+        store.searchCriteria.qcrCode = store.modal.selectedRow.qcrCode;
+        store.searchCriteria.checkMethod = store.modal.selectedRow.checkMethod;
+        store.closeModal();
+    }
+
     async function getQcList() {
+        const qcrCode = store.searchCriteria.qcrCode == '전체' ? null : store.searchCriteria.qcrCode;
+        const checkMethod = store.searchCriteria.checkMethod == '전체' ? null : store.searchCriteria.checkMethod;
         const startDate = kstFormat(store.searchCriteria.startDate);
-        const params = [store.searchCriteria.qcrCode, store.searchCriteria.prodCode, store.searchCriteria.prodName, store.searchCriteria.checkMethod, store.searchCriteria.result, startDate];
+        const params = [qcrCode, store.searchCriteria.prodCode, store.searchCriteria.prodName, checkMethod, store.searchCriteria.result, startDate];
         const result = await qcService.getQcList(params);
         store.qcList = [...result.data];
         return { ok: true };
@@ -95,6 +113,7 @@ export function useQcAppService() {
     }
 
     const funcList = {
+        getSearchList,
         getQcList,
         loadPendingList,
         loadInstruction,
@@ -110,6 +129,7 @@ export function useQcAppService() {
     return {
         ...wrapperFuncs,
         criteriaReset: store.criteriaReset,
+        selectedQcrCode,
         selectedQirCode,
         textClean,
         enterJudge,

@@ -16,7 +16,7 @@ const { qcList } = storeToRefs(qcStore);
             <Button label="엑셀 다운로드" icon="pi pi-file-excel" class="p-button-success" />
         </div>
         <div v-if="qcList.length === 0" class="no-result">조회된 결과가 없습니다.</div>
-        <DataTable v-else :value="qcList" dataKey="id" showGridlines size="small">
+        <DataTable v-else :value="qcList" dataKey="id" paginator :rows="10" showGridlines size="small">
             <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
             <Column field="qcrCode" header="검사유형" />
             <Column field="prodCode" header="제품코드" />

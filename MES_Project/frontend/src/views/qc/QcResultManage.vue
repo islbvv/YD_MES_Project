@@ -1,4 +1,5 @@
 <script setup>
+import { onMounted } from 'vue';
 import QcResultBasicInfo from '../../components/qc/005/QcResultBasicInfo.vue';
 import QcResultInstructionInfo from '../../components/qc/005/QcResultInstructionInfo.vue';
 import QcResultItemTable from '../../components/qc/005/QcResultTable.vue';
@@ -37,6 +38,10 @@ async function clickLoadInstruction() {
         return;
     }
 }
+
+onMounted(() => {
+    qcService.reset();
+});
 </script>
 
 <template>

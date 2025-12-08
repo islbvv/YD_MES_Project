@@ -1,3 +1,10 @@
+const QCR_CODE_LIST = `
+SELECT 
+	qcr_code,
+  check_method
+FROM qcr_tbl
+`;
+
 const QC_SEARCH = `
 SELECT 
 	qir_code,
@@ -54,6 +61,7 @@ WHERE qir_code = ?
 `;
 
 module.exports = {
+  QCR_CODE_LIST,
   QC_SEARCH,
   QC_PENDING_LIST,
   QC_INSTRUCTION,
