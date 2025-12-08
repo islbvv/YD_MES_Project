@@ -113,9 +113,7 @@ const downloadExcel = () => {
         예상완료시간: row.plannedCompletion,
         공정유형: row.processType,
         상태: row.statusLabel,
-        라인코드: row.lineCode,
-        작업자: row.worker,
-        비고: row.remarks
+        라인코드: row.lineCode
     }));
 
     const ws = XLSX.utils.json_to_sheet(excelData);
