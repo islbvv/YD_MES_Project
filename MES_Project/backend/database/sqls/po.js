@@ -28,7 +28,7 @@ module.exports = {
 
     c.client_name       AS clientName,
 
-    mb.mat_type         AS matType,
+    m.material_type_code AS matType,
     COALESCE(mb.in_total, 0) AS inTotal,
     COALESCE(mo.out_total, 0) AS outTotal,
     (COALESCE(mb.in_total, 0) - COALESCE(mo.out_total, 0)) AS curInven,
@@ -45,7 +45,6 @@ module.exports = {
   LEFT JOIN (
     SELECT
       mat_code,
-      MAX(mat_type)   AS mat_type,
       SUM(inbnd_qtt)  AS in_total
     FROM minbnd_tbl
     GROUP BY mat_code
@@ -130,13 +129,13 @@ module.exports = {
   //자재 모달 조회
   selectMateList: `
   SELECT
-    m.mat_code   AS matCode,
-    m.mat_name   AS matName,
-    m.unit       AS unit,
-    c.client_name       AS clientName,
-    c.client_code       AS clientCode,
+    m.mat_code           AS matCode,
+    m.mat_name           AS matName,
+    m.unit               AS unit,
+    c.client_name        AS clientName,
+    c.client_code        AS clientCode,
 
-    mb.mat_type  AS matType,
+    m.material_type_code AS matType,
     COALESCE(mb.in_total, 0) AS inTotal,
     COALESCE(mo.out_total, 0) AS outTotal,
     (COALESCE(mb.in_total, 0) - COALESCE(mo.out_total, 0)) AS curInven,
@@ -151,7 +150,6 @@ module.exports = {
   LEFT JOIN (
     SELECT
       mat_code,
-      MAX(mat_type)   AS mat_type,
       SUM(inbnd_qtt)  AS in_total
     FROM minbnd_tbl
     GROUP BY mat_code
@@ -187,45 +185,34 @@ module.exports = {
   // 발주 자재별 목록 조회
   selectPoListFlat: `
   SELECT
-    d.mpo_d_code                        AS id,
-
-    t.purchase_code                     AS purchaseCode,   -- 발주서번호
-    DATE(t.purchase_req_date)          AS purchaseDate,    -- 발주제안일
-    t.stat                              AS stat,           -- 발주상태
-    t.mcode                             AS mcode,          -- 작성자
-    DATE(t.regdate)                    AS regDate,         -- 등록일자
-
-    mb.mat_type                         AS type,           -- 자재유형 코드
-
-    m.mat_name                          AS matName,        -- 자재명
-
-    c.client_name                       AS clientName,     -- 공급업체
-
-    d.req_qtt                           AS req_qtt,        -- 필요수량
-    d.deadline                          AS deadLine        -- 입고납기일
-
+    d.mpo_d_code                     AS id,
+    t.purchase_code                  AS purchaseCode,
+    DATE(t.purchase_req_date)        AS purchaseDate, 
+    t.stat                           AS stat,         
+    t.mcode                          AS mcode,        
+    DATE(t.regdate)                  AS regDate,        
+    m.material_type_code             AS type,           
+    m.mat_name                       AS matName,        
+    c.client_name                    AS clientName,    
+    d.req_qtt                        AS req_qtt,        
+    d.deadline                       AS deadLine        
   FROM mpo_tbl t
   JOIN mpo_d_tbl d
     ON t.purchase_code = d.purchase_code
-
   LEFT JOIN mat_tbl m
     ON d.mat_code = m.mat_code
-
   LEFT JOIN (
     SELECT
       mat_code,
-      MAX(mat_type) AS mat_type
+      SUM(inbnd_qtt) AS in_total
     FROM minbnd_tbl
     GROUP BY mat_code
   ) mb
     ON d.mat_code = mb.mat_code
-
   LEFT JOIN client_tbl c
     ON m.sup = c.client_code
-
   WHERE 
     (? IS NULL OR t.purchase_code LIKE CONCAT('%', ?, '%'))
-
   ORDER BY
     t.purchase_code DESC,
     d.mpo_d_code
@@ -314,7 +301,7 @@ module.exports = {
 
     m.mat_name          AS matName,
 
-    mb.mat_type         AS matType,
+    m.material_type_code AS matType,
     COALESCE(mb.in_total, 0) AS inTotal,
     COALESCE(mo.out_total, 0) AS outTotal,
     (COALESCE(mb.in_total, 0) - COALESCE(mo.out_total, 0)) AS curInven,
@@ -334,7 +321,6 @@ module.exports = {
   LEFT JOIN (
     SELECT
       mat_code,
-      MAX(mat_type)   AS mat_type,
       SUM(inbnd_qtt)  AS in_total
     FROM minbnd_tbl
     GROUP BY mat_code
@@ -359,4 +345,71 @@ module.exports = {
         client_type AS clientType
       FROM client_tbl
       WHERE 1 = 1`,
+
+  //자재 구매요청서 자재별 목록 조회
+  getMprRequestItemList: `
+    SELECT
+      d.mpr_code         AS mprCode,     -- 요청번호
+      d.mat_code         AS matCode,     -- 자재코드
+      d.req_qtt          AS reqQtt,      -- 요청수량
+      d.unit             AS unit,        -- 단위
+      m.mat_name         AS matName,     -- 자재명
+      c.client_name      AS clientName,  -- 공급업체
+      t.reqdate          AS reqDate      -- 요청일자
+    FROM mpr_d_tbl d
+    JOIN mat_tbl m
+      ON d.mat_code = m.mat_code
+    LEFT JOIN client_tbl c
+      ON m.sup = c.client_code
+    JOIN mpr_tbl t
+      ON d.mpr_code = t.mpr_code
+    ORDER BY
+      t.reqdate DESC,
+      d.mpr_code,
+      d.mat_code
+  `,
+
+  // 상세화면 헤더
+  selectMprDetailHeader: `
+    SELECT
+      t.mpr_code      AS mprCode,      -- 요청번호
+      t.reqdate       AS reqDate,      -- 요청일자
+      t.mcode         AS empCode,      -- 요청자 사번
+      e.emp_name      AS requesterName,-- 요청자 이름
+      d.dept_name     AS deptName      -- 요청부서
+    FROM mpr_tbl t
+    LEFT JOIN emp_tbl  e ON t.mcode     = e.emp_code
+    LEFT JOIN dept_tbl d ON e.dept_code = d.dept_code
+    WHERE t.mpr_code = ?
+  `,
+
+  // 상세화면 - 요청 자재 상세 조회
+  selectMprDetailItems: `
+    SELECT
+      d.mpr_code      AS mprCode,     -- 요청번호
+      d.mat_code      AS matCode,     -- 자재코드
+      m.mat_name      AS matName,     -- 제품명(자재명)
+      d.req_qtt       AS reqQtt,      -- 수량
+      d.unit          AS unit,        -- 단위
+      c.client_name   AS clientName,  -- 공급업체
+      d.note          AS note         -- 비고
+    FROM mpr_d_tbl d
+    JOIN mat_tbl   m ON d.mat_code = m.mat_code
+    LEFT JOIN client_tbl c ON m.sup = c.client_code
+    WHERE d.mpr_code = ?
+    ORDER BY d.mat_code
+  `,
+  // 매핑테이블
+  insertMprMap: `
+  INSERT INTO mpr_mapp_tbl (
+    mapp_code,
+    mpr_code,
+    purchase_code
+  ) VALUES (?, ?, ?)
+`,
+  //매핑 삭제
+  deleteMprMappByPurchaseCode: `
+  DELETE FROM mpr_mapp_tbl
+  WHERE purchase_code = ?
+`,
 };
