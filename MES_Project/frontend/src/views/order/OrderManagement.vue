@@ -2,6 +2,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 import SearchSelectModal from '@/views/order/SearchSelectModal.vue';
+import ProductSelectModal from '@/components/order/ProductSelectModal.vue';
 
 // 모달 ON/OFF
 const showOrderModal = ref(false);
@@ -11,7 +12,6 @@ const showManagerModal = ref(false);
 
 // 모달 검색 결과
 const orderSearchList = ref([]);
-const productSearchList = ref([]);
 const clientSearchList = ref([]);
 const managerSearchList = ref([]);
 
@@ -27,7 +27,7 @@ function formatDate(dateStr) {
     return `${y}.${m}.${day}`;
 }
 
-// 모달 검색 이벤트
+// 주문 검색
 const fetchOrderSearch = async (keyword = '') => {
     try {
         const res = await axios.get('/api/order/search', { params: { keyword } });
@@ -90,42 +90,13 @@ const onManagerSelect = (row) => {
     showManagerModal.value = false;
 };
 
-const fetchProductSearch = async (keyword = '') => {
-    try {
-        // 엔드포인트 수정: /api/order/product/search
-        const res = await axios.get('/api/order/product/search', { params: { keyword } });
-        if (res.data && res.data.code === 'S200') {
-            // API 결과에서 필요한 필드를 직접 사용하고 저장합니다.
-            // unit, spec 등의 상세 정보를 선택 시 바로 반영하기 위해 전체 객체를 저장합니다.
-            productSearchList.value = (res.data.data || []).map((p) => ({
-                prod_code: p.prod_code,
-                prod_name: p.prod_name,
-
-                // 코드값 (DB 저장용)
-                unit: p.unit,
-                spec: p.spec,
-                com_value: p.com_value,
-
-                // 화면 표시용
-                unit_name: p.unit_name, // 상세 테이블에 반영
-                spec_name: p.spec_name, // 상세 테이블에 반영
-                com_value_name: p.com_value_name // 모달 컬럼에 필요
-            }));
-        } else {
-            productSearchList.value = [];
-        }
-    } catch (e) {
-        console.error('fetchProductSearch', e);
-        productSearchList.value = [];
-    }
-};
-
-const onProductSelect = (row) => {
-    const idx = currentProductIndex.value;
+const onProductSelect = ({ row, index }) => {
+    const idx = index;
     if (idx === -1 || !row || !row.prod_code) return;
 
     const p = products.value[idx];
 
+    // 제품 정보 반영
     p.prod_code = row.prod_code || '';
     p.prod_name = row.prod_name || '';
 
@@ -139,11 +110,6 @@ const onProductSelect = (row) => {
     p.spec_name = row.spec_name;
     p.type_name = row.com_value_name;
 
-    // 선택 상태 초기화
-    p._selected = false;
-
-    // 모달 닫기 및 인덱스 초기화
-    showProductModal.value = false;
     currentProductIndex.value = -1;
 };
 
@@ -459,15 +425,7 @@ function openProductSearch(idx) {
     // 1. 현재 선택된 행의 인덱스를 저장
     currentProductIndex.value = idx;
 
-    // 1. 모달 열기 전에 검색 API 호출
-    fetchProductSearch('').then(() => {
-        // 모달 열기 전에 새로운 배열 생성
-        const resetList = productSearchList.value.map((p) => ({ ...p, _selected: false }));
-        productSearchList.value = resetList;
-
-        // 모달 열기
-        showProductModal.value = true;
-    });
+    showProductModal.value = true;
 }
 
 function formatCurrency(v) {
@@ -550,7 +508,7 @@ function formatCurrency(v) {
                         <td class="center"><input type="checkbox" v-model="p._selected" /></td>
                         <td>
                             <div class="prod-name">
-                                <input type="text" v-model="p.prod_name" />
+                                <input type="text" v-model="p.prod_name" @click="openProductSearch(idx)" readonly />
                                 <button class="icon" @click="openProductSearch(idx)" title="제품 검색">🔍</button>
                             </div>
                         </td>
@@ -606,7 +564,7 @@ function formatCurrency(v) {
             @confirm="onOrderSelect"
         />
 
-        <SearchSelectModal
+        <!-- <SearchSelectModal
             v-model="showProductModal"
             searchPlaceholder="제품명 또는 제품코드를 입력해주세요."
             :columns="[
@@ -618,12 +576,14 @@ function formatCurrency(v) {
             rowKey="prod_code"
             @search="fetchProductSearch"
             @confirm="onProductSelect"
-        />
+        /> -->
+
+        <ProductSelectModal v-model="showProductModal" :currentIndex="currentProductIndex" @select="onProductSelect" />
 
         <!-- 거래처 선택 모달 -->
         <SearchSelectModal
             v-model="showClientModal"
-            searchPlaceholder="거래처 이름 또는 코드로 검색"
+            searchPlaceholder="거래처명 또는 거래처 코드를 입력해주세요."
             :columns="[
                 { field: 'client_code', label: '거래처 코드' },
                 { field: 'client_name', label: '거래처명' },
@@ -640,7 +600,7 @@ function formatCurrency(v) {
         <!-- 담당자 선택 모달 -->
         <SearchSelectModal
             v-model="showManagerModal"
-            searchPlaceholder="담당자 이름 또는 코드로 검색"
+            searchPlaceholder="담당자 이름 또는 담당자 코드를 입력해주세요."
             :columns="[
                 { field: 'emp_code', label: '사원 코드' },
                 { field: 'emp_name', label: '이름' },
