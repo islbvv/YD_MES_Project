@@ -88,6 +88,21 @@ function getToday() {
     return new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
 }
 
+function toDateOnly(value) {
+    if (!value) return null;
+
+    if (value instanceof Date) {
+        return value.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+    }
+
+    const s = String(value);
+    if (s.length >= 10) {
+        return s.substring(0, 10);
+    }
+
+    return s;
+}
+
 // 헤더 필드
 const writerCode = ref('');
 const writerName = ref('');
@@ -195,7 +210,7 @@ const savePo = async () => {
     const header = {
         mpr_code: Code.value,
         reqdate: reqDate.value || today,
-        deadline: deadLine.value || null,
+        deadline: toDateOnly(deadLine.value) || null,
         mrp_code: 'MRP-20250624-001', // 임시 나중에 MRP 연동되면 수정
         mcode: writerCode.value
     };
