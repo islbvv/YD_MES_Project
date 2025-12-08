@@ -97,21 +97,17 @@ const filteredRows = computed(() => {
     });
 });
 
-
 // 날짜에서 'YYYY-MM-DD'만 추출하는 함수
 const toDateOnly = (dateString) => {
-  if (!dateString) return "";
+    if (!dateString) return '';
 
-  const d = new Date(dateString);
-  if (isNaN(d)) return "";
+    const d = new Date(dateString);
+    if (isNaN(d)) return '';
 
-  const local = new Date(d.getTime() - (d.getTimezoneOffset() * 60000))
-                      .toISOString()
-                      .split("T")[0];
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
-  return local;
+    return local;
 };
-
 
 onBeforeMount(() => {
     getTaskList();
