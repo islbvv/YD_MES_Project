@@ -92,6 +92,18 @@ export function useQcAppService() {
         return { ok: true, message: '품질검사결과 저장 완료' };
     }
 
+    async function deleteResult() {
+        if (store.basic.qirCode == null) {
+            return { ok: false, message: '검사결과를 확인해주세요.' };
+        }
+        const result = await qcService.deleteResult({ qirCode: store.basic.qirCode });
+        if (!result.data.ok) {
+            throw new Error('품질검사결과 삭제 중 오류 발생');
+        }
+        // store.reset();
+        return { ok: true, message: '품질검사결과 삭제 완료' };
+    }
+
     function textClean(row) {
         row.value = row.value.replace(/\D/g, '');
     }
@@ -117,7 +129,8 @@ export function useQcAppService() {
         getQcList,
         loadPendingList,
         loadInstruction,
-        saveResult
+        saveResult,
+        deleteResult
     };
 
     const wrapperFuncs = Object.keys(funcList).reduce((acc, key) => {

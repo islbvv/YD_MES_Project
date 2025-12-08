@@ -1,4 +1,5 @@
-const { query } = require('../database/mapper.js');
+const { query, getConnection } = require('../database/mapper.js');
+const qcSql = require('../database/sqls/qc/qcSQL');
 
 // 004 목록 조회
 async function findQcrList(params) {
@@ -53,11 +54,19 @@ async function saveResultService(data) {
 }
 
 async function deleteResultService(params) {
+  const conn = await getConnection();
   try {
-    console.log(params);
-    // return await query('QC_RESULT_DELETE', params);
+    await conn.beginTransaction();
+
+    const result = await conn.query(qcSql.QC_RESULT_DELETE, [params.qir_code]);
+
+    await conn.commit();
+    return { ok: true };
   } catch (err) {
+    await conn.rollback();
     throw err;
+  } finally {
+    await conn.release();
   }
 }
 

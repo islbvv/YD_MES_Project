@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const qcService = require('../services/qcService');
 
-// 004 목록 조회
+// 004 qcr_code, check_method 조회
 router.get('/list', async (req, res) => {
   try {
     const result = await qcService.findQcrList();
@@ -12,6 +12,7 @@ router.get('/list', async (req, res) => {
   }
 });
 
+// 004 검색 및 조회
 router.post('/list', async (req, res) => {
   try {
     console.log(req.body);
@@ -43,7 +44,7 @@ router.get('/instruction/:qir_code', async (req, res) => {
 });
 
 // 005 저장
-router.put('/save', async (req, res) => {
+router.put('/', async (req, res) => {
   try {
     const result = await qcService.saveResultService(req.body);
     res.json(result);
@@ -53,9 +54,10 @@ router.put('/save', async (req, res) => {
 });
 
 // 005 삭제
-router.delete('/:qirCode', async (req, res) => {
+router.post('/delete', async (req, res) => {
   try {
-    const result = await qcService.deleteResultService(req.params);
+    const result = await qcService.deleteResultService(req.body);
+    console.log(result);
     res.json(result);
   } catch (err) {
     res.status(500).json({ ok: false, message: 'delete Router Error' });
