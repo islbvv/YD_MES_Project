@@ -525,7 +525,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="forward-check-page" @keyup.enter="doSearch">
+    <div class="forward-check-page">
         <!-- 🔍 모달들 -->
         <!-- 출고번호 선택 모달 -->
         <SearchSelectModal
@@ -567,7 +567,8 @@ onMounted(() => {
         />
 
         <!-- 🔍 검색 조건 영역 -->
-        <section class="search-card">
+        <!-- ✅ form 으로 변경 + submit 으로 조회 -->
+        <form class="search-card" @submit.prevent="doSearch">
             <h3>출고조회</h3>
             <div class="search-grid">
                 <!-- 출고번호 -->
@@ -616,10 +617,10 @@ onMounted(() => {
             </div>
 
             <div class="search-actions">
-                <button class="btn btn-black" @click="resetForm">초기화</button>
-                <button class="btn btn-yellow" @click="doSearch">조회</button>
+                <button type="button" class="btn btn-black" @click="resetForm">초기화</button>
+                <button type="submit" class="btn btn-yellow">조회</button>
             </div>
-        </section>
+        </form>
 
         <!-- 📋 결과 영역 -->
         <section class="result-card">
@@ -650,7 +651,17 @@ onMounted(() => {
                             <td colspan="8" class="empty">검색 결과가 없습니다.</td>
                         </tr>
 
-                        <tr v-for="row in groupedFilteredRows" :key="row.releaseNo" class="clickable-row" @click="$router.push({ name: 'ForwardingDetail', params: { releaseCode: row.releaseNo } })">
+                        <tr
+                            v-for="row in groupedFilteredRows"
+                            :key="row.releaseNo"
+                            class="clickable-row"
+                            @click="
+                                $router.push({
+                                    name: 'ForwardingDetail',
+                                    params: { releaseCode: row.releaseNo }
+                                })
+                            "
+                        >
                             <td>
                                 <input type="checkbox" v-model="checkedMap[row.releaseNo]" @click.stop />
                             </td>
