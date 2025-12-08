@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useRouter } from 'vue-router';
 import inboundApi from '@/api/inbound'; // API 모듈 Import
+import * as XLSX from 'xlsx'; // 엑셀 다운로드 기능
 
 const toast = useToast();
 const router = useRouter();
@@ -89,6 +90,44 @@ const onReset = () => {
 
 const goToPage = (path) => {
     router.push(path);
+};
+
+const exportToExcel = () => {
+    if (!historyList.value || historyList.value.length === 0) {
+        toast.add({ severity: 'warn', summary: '내보낼 데이터 없음', detail: '테이블에 데이터가 없습니다.', life: 3000 });
+        return;
+    }
+
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const filename = `자재_입출고_내역_${year}${month}${day}.xlsx`;
+
+    const dataToExport = historyList.value.map((item) => ({
+        구분: getTypeLabel(item.type),
+        처리일자: formatDateDisplay(item.procDate),
+        자재코드: item.matCode,
+        자재명: item.matName,
+        요청수량: item.reqQty,
+        처리수량: item.procQty,
+        단위: item.unit,
+        처리상태: getStatusLabel(item.status),
+        담당자: item.manager,
+        비고: item.remark
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '입출고내역');
+
+    // 컬럼 너비 자동 조정 (선택 사항)
+    const colWidths = Object.keys(dataToExport[0]).map((key) => ({
+        wch: Math.max(15, key.length, ...dataToExport.map((row) => (row[key] ? String(row[key]).length : 0)))
+    }));
+    worksheet['!cols'] = colWidths;
+
+    XLSX.writeFile(workbook, filename);
 };
 
 // ------------------------------------------------------------------
@@ -179,9 +218,9 @@ onMounted(() => {
 
                 <div class="flex gap-2">
                     <!-- 실제 라우터 경로에 맞게 to 속성이나 click 핸들러 수정 필요 -->
-                    <Button label="입고등록" icon="pi pi-plus" severity="info" size="small" @click="goToPage('/inbound/register')" />
-                    <Button label="출고등록" icon="pi pi-minus" severity="warn" size="small" @click="goToPage('/outbound/register')" />
-                    <Button label="엑셀 다운로드" icon="pi pi-file-excel" severity="success" outlined size="small" />
+                    <Button label="입고등록" icon="pi pi-plus" severity="info" size="small" @click="goToPage('/inbound-registration')" />
+                    <Button label="출고등록" icon="pi pi-minus" severity="warn" size="small" @click="goToPage('/outbound-registration')" />
+                    <Button label="엑셀 다운로드" icon="pi pi-file-excel" severity="success" outlined size="small" @click="exportToExcel" />
                 </div>
             </div>
 

@@ -233,9 +233,18 @@ onMounted(() => {
                                 {{ formatDateTime(data.date) }}
                             </template>
                         </Column>
-                        <Column field="type" header="구분" headerClass="center-header" bodyClass="text-center" />
+                        <Column field="type" header="구분" headerClass="center-header" bodyClass="text-center">
+                            <template #body="{ data }">
+                                <div class="status-chip justify-center">
+                                    <span class="status-dot" :class="data.type === '입고' ? 'type-dot-inbound' : 'type-dot-outbound'"></span>
+                                    <span>{{ data.type }}</span>
+                                </div>
+                            </template>
+                        </Column>
                         <Column field="amount" header="수량" headerClass="center-header" bodyClass="text-center">
-                            <template #body="{ data }"> {{ data.amount }} {{ selected.unit }} </template>
+                            <template #body="{ data }">
+                                <span :class="['font-bold', data.type === '입고' ? 'type-text-inbound' : 'type-text-outbound']"> {{ data.type === '입고' ? '+' : '-' }}{{ data.amount }} {{ selected.unit }} </span>
+                            </template>
                         </Column>
                         <Column field="supplier" header="공급업체" headerClass="center-header" bodyClass="text-center" />
                         <Column field="manager" header="담당자" headerClass="center-header" bodyClass="text-center" />
@@ -447,6 +456,22 @@ onMounted(() => {
 .status-text {
     font-size: 0.85rem;
     color: #374151;
+}
+
+.type-dot-inbound {
+    background-color: #16a34a;
+}
+.type-dot-outbound {
+    background-color: #3b82f6;
+}
+.type-text-inbound {
+    color: #16a34a;
+}
+.type-text-outbound {
+    color: #3b82f6;
+}
+.font-bold {
+    font-weight: 700;
 }
 </style>
 <style>
