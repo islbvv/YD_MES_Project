@@ -1,6 +1,6 @@
 import { qcService } from './qcService';
 import { useQcResultStore } from '../../stores/qc/qcResultStore';
-import { dateTime } from '../../components/qc/utils/dateFormat';
+import { dateTime, kstFormat } from '../../components/qc/utils/dateFormat';
 
 export function useQcAppService() {
     const store = useQcResultStore();
@@ -17,7 +17,8 @@ export function useQcAppService() {
     }
     // 004
     async function getQcList() {
-        const params = [store.searchCriteria.qcrCode, store.searchCriteria.prodCode, store.searchCriteria.prodName, store.searchCriteria.checkMethod, store.searchCriteria.result, store.searchCriteria.startDate];
+        const startDate = kstFormat(store.searchCriteria.startDate);
+        const params = [store.searchCriteria.qcrCode, store.searchCriteria.prodCode, store.searchCriteria.prodName, store.searchCriteria.checkMethod, store.searchCriteria.result, startDate];
         const result = await qcService.getQcList(params);
         store.qcList = [...result.data];
         return { ok: true };
@@ -85,6 +86,14 @@ export function useQcAppService() {
         store.basic.result = row.result == '합격' ? 'g2' : 'g1';
     }
 
+    function resultBody(result) {
+        if (result == 'g2') {
+            return `<span class="text-green-600 font-bold">합격</span>`;
+        } else {
+            return `<span class="text-red-600 font-bold">불합격</span>`;
+        }
+    }
+
     const funcList = {
         getQcList,
         loadPendingList,
@@ -104,6 +113,7 @@ export function useQcAppService() {
         selectedQirCode,
         textClean,
         enterJudge,
+        resultBody,
         reset: store.reset,
         closeModal: store.closeModal
     };

@@ -1,17 +1,11 @@
 <script setup>
 import { storeToRefs } from 'pinia';
 import { useQcResultStore } from '../../../stores/qc/qcResultStore';
-import { dateTime } from '../utils/dateFormat';
+import { useQcAppService } from '../../../service/qc/qcAppService';
 
+const qcService = useQcAppService();
 const qcStore = useQcResultStore();
 const { qcList } = storeToRefs(qcStore);
-function resultBody(result) {
-    if (result === 'g2') {
-        return `<span class="text-green-600 font-bold">합격</span>`;
-    } else {
-        return `<span class="text-red-600 font-bold">불합격</span>`;
-    }
-}
 </script>
 
 <template>
@@ -31,12 +25,12 @@ function resultBody(result) {
             <Column field="unit" header="단위" />
             <Column field="result" header="결과">
                 <template #body="slotProps">
-                    <span v-html="resultBody(slotProps.data.result)"></span>
+                    <span v-html="qcService.resultBody(slotProps.data.result)"></span>
                 </template>
             </Column>
             <Column field="startDate" header="검사일">
                 <template #body="slotProps">
-                    {{ dateTime(slotProps.data.startDate) }}
+                    {{ slotProps.data.startDate }}
                 </template>
             </Column>
         </DataTable>

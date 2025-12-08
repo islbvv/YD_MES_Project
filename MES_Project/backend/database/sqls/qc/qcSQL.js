@@ -8,7 +8,7 @@ SELECT
   note,
   unit,
   result,
-  start_date
+  DATE_FORMAT(start_date, '%y-%m-%d') AS start_date
 FROM v_quality_result
 WHERE qcr_code LIKE CONCAT('%', IFNULL(?, ''), '%')
 AND prod_code LIKE CONCAT('%', IFNULL(?, ''), '%')

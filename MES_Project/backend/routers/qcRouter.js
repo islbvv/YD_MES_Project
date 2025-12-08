@@ -5,6 +5,7 @@ const qcService = require('../services/qcService');
 // 004 목록 조회
 router.post('/list', async (req, res) => {
   try {
+    console.log(req.body);
     const result = await qcService.findQcListService(req.body);
     res.json(result);
   } catch (err) {

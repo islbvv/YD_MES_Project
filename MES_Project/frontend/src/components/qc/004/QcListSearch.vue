@@ -14,11 +14,6 @@ const searchQcList = async () => {
         return;
     }
 };
-
-const searchReset = () => {
-    qcService.criteriaReset();
-};
-
 const qcrCodeList = [
     { key: '전체', value: null },
     { key: 'QCR-PROD-001', value: 'QCR-PROD-001' },
@@ -38,7 +33,7 @@ const resultList = [
         <div class="grid-3col">
             <div class="cell">
                 <label>검사유형</label>
-                <Dropdown class="w-full" v-model="searchCriteria.qcrCore" :options="qcrCodeList" optionLabel="key" optionValue="value" />
+                <Dropdown class="w-full" v-model="searchCriteria.qcrCode" :options="qcrCodeList" optionLabel="key" optionValue="value" />
             </div>
 
             <div class="cell">
@@ -71,7 +66,7 @@ const resultList = [
 
             <!-- 버튼 -->
             <div class="cell btn-cell">
-                <Button label="초기화" class="p-button-secondary mr-2" @click="searchReset" />
+                <Button label="초기화" class="p-button-secondary mr-2" @click="qcService.criteriaReset" />
                 <Button label="조회" class="p-button-warning" @click="searchQcList" />
             </div>
         </div>
