@@ -92,7 +92,7 @@ const handleModalConfirm = async (selectedItem) => {
 
         if ((selectedItem.prdr_code != null && selectedItem.mpo_d_code == null) || (selectedItem.prdr_code == null && selectedItem.mpo_d_code != null)) {
             if (selectedItem.mpo_d_code != null) {
-                formState.value.target_type = qualityStore.selectedQIO[0][0].note; //'자재';
+                formState.value.target_type = qualityStore.selectedQIO[0][0].note; //'원자재 || 부자재';
                 formState.value.item_code = qualityStore.selectedQIO[0][0].mpo_d_code;
                 formState.value.item_name = qualityStore.selectedQIO[0][0].mat_name;
                 formState.value.item_quantity = qualityStore.selectedQIO[0][0].req_qtt;
@@ -221,7 +221,7 @@ const seveQualityInspectionOrder = async () => {
         emp_code: formState.value.emp_code,
         insp_vol: formState.value.item_quantity,
         prdr_code: formState.value.target_type === '제품' ? formState.value.item_code : null,
-        mpo_d_code: formState.value.target_type === ('t1' || 't2') ? formState.value.item_code : null,
+        mpo_d_code: formState.value.target_type !== '제품' ? formState.value.item_code : null,
         qcr_codes: selectedProducts.value.map((item) => item.qcr_code)
     };
 

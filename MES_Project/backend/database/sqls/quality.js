@@ -103,7 +103,7 @@ WHERE emp.dept_code = 'DEPT-5'
   , qio.emp_code
   , DATE_FORMAT(qio.insp_date, '%Y-%m-%d') AS insp_date
   , qio.prdr_code
-  , qio.mpr_d_code
+  , qio.mpo_d_code
   , qio.insp_vol
   , DATE_FORMAT(qio.qio_date, '%Y-%m-%d') AS qio_date
   , emp.emp_name
@@ -112,7 +112,7 @@ WHERE emp.dept_code = 'DEPT-5'
   ON emp.emp_code = qio.emp_code
   WHERE emp.dept_code = 'DEPT-5'
   AND emp.emp_job_id = 'm1'
-  AND (qio.prdr_code IS NOT NULL OR qio.mpr_d_code IS NOT NULL)
+  AND (qio.prdr_code IS NOT NULL OR qio.mpo_d_code IS NOT NULL)
 `,
   findQIRsByQIO: `
 select qcr.qcr_code
