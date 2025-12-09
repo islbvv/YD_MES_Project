@@ -258,9 +258,9 @@ const seveQualityInspectionOrder = async () => {
         <div class="flex justify-between items-center">
             <div class="font-semibold text-xl">기본정보</div>
             <div class="flex gap-2">
-                <Button label="삭제"></Button>
-                <Button label="초기화" @click="resetForm"></Button>
-                <Button label="저장" @click="seveQualityInspectionOrder"></Button>
+                <Button label="삭제" severity="danger"></Button>
+                <Button label="초기화" severity="secondary" @click="resetForm"></Button>
+                <Button label="저장" severity="success" @click="seveQualityInspectionOrder"></Button>
                 <Button label="검사지시 불러오기" @click="openModal('inspection')"></Button>
             </div>
         </div>
