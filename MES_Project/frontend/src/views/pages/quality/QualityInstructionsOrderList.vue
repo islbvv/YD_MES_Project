@@ -3,8 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useQualityStore } from '@/stores/qualityStore';
 import * as XLSX from 'xlsx';
 import { useRouter } from 'vue-router';
-import SearchSelectModal from '@/components/common/SearchSelectModal.vue';
-import axios from 'axios'; // 모달 데이터 로딩을 위해 유지
+import SearchModal from './SearchModal.vue'; // SearchModal로 변경
 
 const router = useRouter();
 const qualityStore = useQualityStore();
@@ -17,15 +16,14 @@ const filters = ref({
     insp_date_end: ''
 });
 
-// API로 가져온 원본 목록 (Store와 연결)
 const allList = computed(() =>
     qualityStore.qualityInstructionsOrderList.map((item) => ({
         ...item,
         checked: false
     }))
 );
-const tableRows = ref([]); // 화면에 표시될 목록 (필터링 적용)
-const allChecked = ref(false); // 전체 선택 체크박스 상태
+const tableRows = ref([]);
+const allChecked = ref(false);
 
 // --- 2. 모달 상태 및 설정 ---
 const isModalVisible = ref(false);
@@ -33,49 +31,29 @@ const modalType = ref('');
 const modalTitle = ref('');
 const modalColumns = ref([]);
 const modalRows = ref([]);
-const modalSearchPlaceholder = ref('');
 
-// --- 3. API 및 데이터 로직 ---
+// --- 3. 이벤트 핸들러 ---
 
-// 모달에 표시할 데이터 조회 (axios 유지)
-const fetchModalData = async (type, keyword = '') => {
-    let url = '';
-    const params = { keyword };
-    switch (type) {
-        case 'qio':
-            // 이 API는 필터링 전용이므로, 전체 목록을 사용하거나 별도 API 필요
-            // 여기서는 allList를 사용하도록 수정
-            modalRows.value = allList.value.filter((item) => item.qio_code.includes(keyword));
-            return;
-        case 'product':
-            // 제품 목록 API는 없으므로, 현재 데이터에서 item_name을 추출하여 사용
-            const itemNames = [...new Set(allList.value.map((item) => item.item_name))];
-            modalRows.value = itemNames
-                .filter((name) => name.includes(keyword))
-                .map((name) => ({
-                    prod_name: name
-                }));
-            return;
-    }
-    // 다른 모달 유형이 필요하다면 여기에 axios 호출 유지 가능
-    try {
-        const response = await axios.get(url, { params });
-        modalRows.value = response.data;
-    } catch (error) {
-        console.error(`${type} 모달 데이터 조회 실패:`, error);
-        modalRows.value = [];
-    }
+// 날짜 포맷 함수
+const formatDate = (date) => {
+    if (!date) return null;
+    if (typeof date === 'string') return date; // 이미 문자열이면 그대로 반환
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
-
-// --- 4. 이벤트 핸들러 ---
 
 // 조회 버튼 클릭
 const onSearch = () => {
     const f = filters.value;
+    const startDate = formatDate(f.insp_date_start);
+    const endDate = formatDate(f.insp_date_end);
+
     tableRows.value = allList.value.filter((row) => {
         const isQioMatch = !f.qio_code || row.qio_code.includes(f.qio_code);
         const isProdMatch = !f.prod_name || (row.item_name && row.item_name.includes(f.prod_name));
-        const isDateMatch = (!f.insp_date_start || row.insp_date >= f.insp_date_start) && (!f.insp_date_end || row.insp_date <= f.insp_date_end);
+        const isDateMatch = (!startDate || row.insp_date >= startDate) && (!endDate || row.insp_date <= endDate);
         return isQioMatch && isProdMatch && isDateMatch;
     });
 };
@@ -90,43 +68,37 @@ const onReset = () => {
     };
     tableRows.value = [...allList.value];
     allChecked.value = false;
-    // 모든 행의 checked 상태도 초기화
     tableRows.value.forEach((row) => (row.checked = false));
 };
 
 // 모달 열기
-const openModal = async (type) => {
+const openModal = (type) => {
     modalType.value = type;
     isModalVisible.value = true;
-    modalRows.value = []; // 이전 데이터 초기화
+    modalRows.value = [];
 
     switch (type) {
         case 'qio':
             modalTitle.value = '지시코드 선택';
             modalColumns.value = [
-                { field: 'qio_code', label: '지시코드' },
-                { field: 'insp_date', label: '지시일자' }
+                { field: 'qio_code', header: '지시코드' },
+                { field: 'insp_date', header: '지시일자' }
             ];
-            modalSearchPlaceholder.value = '지시코드를 입력하세요.';
+            modalRows.value = allList.value; // 전체 목록 전달
             break;
         case 'product':
             modalTitle.value = '제품명 선택';
-            modalColumns.value = [{ field: 'prod_name', label: '제품명' }];
-            modalSearchPlaceholder.value = '제품명을 입력하세요.';
+            modalColumns.value = [{ field: 'prod_name', header: '제품명' }];
+            const itemNames = [...new Set(allList.value.map((item) => item.item_name).filter(Boolean))];
+            modalRows.value = itemNames.map((name) => ({ prod_name: name }));
             break;
     }
-    await fetchModalData(type);
-};
-
-// 모달에서 검색
-const handleModalSearch = (keyword) => {
-    fetchModalData(modalType.value, keyword);
 };
 
 // 모달에서 항목 선택
 const handleModalConfirm = (selectedItem) => {
     if (!selectedItem) {
-        alert('항목을 선택해주세요.');
+        // SearchModal은 선택하지 않고 확인을 누르면 null을 반환할 수 있음
         return;
     }
     switch (modalType.value) {
@@ -177,7 +149,7 @@ const downloadExcel = () => {
     XLSX.writeFile(workbook, `품질검사지시목록_${today}.xlsx`);
 };
 
-// 상세 페이지로 이동 -> 체크박스 토글 기능으로 변경
+// 행 클릭 시 체크박스 토글
 const goDetail = (row) => {
     if (row) {
         row.checked = !row.checked;
@@ -185,7 +157,7 @@ const goDetail = (row) => {
     }
 };
 
-// --- 5. 라이프사이클 ---
+// --- 라이프사이클 ---
 onMounted(async () => {
     await qualityStore.fetchQualityInstructionsOrderList();
     tableRows.value = [...allList.value]; // 초기 데이터 로드
@@ -269,19 +241,13 @@ onMounted(async () => {
             </div>
         </section>
 
-        <SearchSelectModal
-            v-model="isModalVisible"
-            :title="modalTitle"
-            :columns="modalColumns"
-            :rows="modalRows"
-            @search="handleModalSearch"
-            @confirm="handleModalConfirm"
-            @cancel="isModalVisible = false"
-        />
+        <!-- SearchModal로 교체 -->
+        <SearchModal v-model:visible="isModalVisible" :header="modalTitle" :data="modalRows" :columns="modalColumns" @onConfirm="handleModalConfirm" />
     </div>
 </template>
 
 <style scoped>
+/* 스타일은 이전과 동일하게 유지 */
 .inbound-container {
     font-family: 'Pretendard', 'Inter', sans-serif;
     background-color: #f8f9fa;
