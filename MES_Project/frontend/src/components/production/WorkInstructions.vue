@@ -52,29 +52,6 @@ const localWorkOrder = reactive({ ...props.workOrderData });
 const showProductModal = ref(false);
 const openProductModal = () => (showProductModal.value = true);
 
-const handleProductSelect = (payload) => {
-    if (payload?.row) {
-        const p = payload.row;
-        localWorkOrder.productName = p.prod_name || '';
-        localWorkOrder.lineCode = p.line_code || '';
-        localWorkOrder.prodCode = p.prod_code || '';
-    }
-    showProductModal.value = false;
-};
-const resetWorkOrder = () => {
-    const emptyData = {
-        prodCode: '',
-        productName: '',
-        instructionQuantity: '',
-        startDate: '',
-        expectedCompletion: '',
-        instructionStatus: 'v4',
-        lineType: '',
-        lineCode: ''
-    };
-    Object.assign(localWorkOrder, emptyData);
-};
-
 /* -------------------------
       라인 선택 모달
 ------------------------- */

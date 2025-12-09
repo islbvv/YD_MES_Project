@@ -59,9 +59,13 @@ INSERT INTO wko_tbl (
 `;
 
 const selectLine = `
-    SELECT 
-    line_code
-FROM line_tbl`;
+SELECT DISTINCT
+    p.prod_proc_code,
+    l.line_code
+FROM 
+    prod_proc_tbl p
+CROSS JOIN 
+    line_tbl l;`;
 
 module.exports = {
   plan,
