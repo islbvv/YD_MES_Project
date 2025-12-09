@@ -128,8 +128,7 @@ const SELECT_RELEASE_LIST_ALL = `
     orq.out_req_date,
     orq.ord_code,
     c.client_name,
-    odtot.totalOrderQty,
-    rel.totalReleaseQty
+    odtot.totalOrderQty
 
   -- 🔹 전체 표시 (HAVING 없음)
   ORDER BY
