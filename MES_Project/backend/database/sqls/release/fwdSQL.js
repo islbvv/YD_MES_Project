@@ -701,6 +701,36 @@ const GENERATE_POUTBND_CODE = `
 `;
 
 /* ===========================
+ *  제품별 LOT 재고 조회 (FIFO용)
+ *  - pinbnd_tbl 기준
+ *  - remainQty > 0 인 lot만
+ *  - pinbnd_date 오름차순 = 선입선출
+ * =========================== */
+const SELECT_LOT_FIFO_LIST = `
+  SELECT
+    p.lot_num    AS lotNum,
+    p.prod_code  AS productCode,
+    (p.qtt - COALESCE(o.out_qty, 0)) AS remainQty
+  FROM pinbnd_tbl p
+  LEFT JOIN (
+    SELECT
+      lot_num,
+      prod_code,
+      SUM(outbnd_qtt) AS out_qty
+    FROM poutbnd_tbl
+    WHERE prod_code = ?
+    GROUP BY lot_num, prod_code
+  ) o
+    ON o.lot_num   = p.lot_num
+   AND o.prod_code = p.prod_code
+  WHERE p.prod_code = ?
+    AND (p.qtt - COALESCE(o.out_qty, 0)) > 0
+  ORDER BY
+    p.pinbnd_date ASC,
+    p.pinbnd_code ASC
+`;
+
+/* ===========================
  *  실출고 INSERT (poutbnd_tbl)
  * =========================== */
 const INSERT_POUTBND = `
@@ -788,4 +818,5 @@ module.exports = {
   INSERT_POUTBND,
   SELECT_RELEASE_ORDER_CLIENT,
   SELECT_RELEASE_LINE_SUMMARY,
+  SELECT_LOT_FIFO_LIST,
 };

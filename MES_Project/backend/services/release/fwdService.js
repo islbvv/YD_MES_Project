@@ -752,7 +752,7 @@ async function createOutboundRelease({ header, lines }) {
       const shippedQty = Number(summary.shippedQty) || 0;
       const remainingQty = Number(summary.remainingQty) || 0;
 
-      // 🔹 2) 재고/남은요청 수량 검증
+      // 🔹 2) 재고/남은요청 수량 검증 (기존 로직 유지)
       if (qty > remainingQty) {
         throw new Error(
           `제품(${line.productCode})의 출고수량이 남은 요청수량을 초과했습니다. (출고: ${qty}, 남은요청: ${remainingQty})`
@@ -765,40 +765,78 @@ async function createOutboundRelease({ header, lines }) {
         );
       }
 
-      const newShippedTotal = shippedQty + qty;
-
-      // 🔹 3) 이번 출고 이후 상태코드 결정 (0Q)
-      // q1: 출고 대기 (실제론 출고 안 했을 때만)
-      // q2: 부분 출고 (누적 < 요청)
-      // q3: 출고 완료 (누적 == 요청)
-      let lineStatus = "q2";
-      if (newShippedTotal >= requestedQty) {
-        lineStatus = "q3";
-      } else if (newShippedTotal <= 0) {
-        lineStatus = "q1";
-      }
-
-      // 🔹 4) 실출고 코드 자동채번
-      const poutCodeRows = await conn.query(fwdSQL.GENERATE_POUTBND_CODE);
-      const poutbndCode = poutCodeRows[0].poutbnd_code;
-
-      const deadline = line.dueDate || outDate;
-      const lotNum = null; // lot 관리 나중에 붙이면 여기 수정
-
-      await conn.query(fwdSQL.INSERT_POUTBND, [
-        poutbndCode, // poutbnd_code
-        qty, // req_qtt  (이번 요청 기준 수량)
-        qty, // outbnd_qtt
-        deadline, // deadline
-        lineStatus, // stat (0Q: q2 or q3)
-        releaseCode, // outbound_request_code
-        lotNum, // lot_num
-        line.productCode, // prod_code
-        clientCode, // client_code
-        registrant, // mcode
+      // 🔹 3) FIFO용 LOT 재고 조회 (pinbnd_tbl 기준)
+      const lotRows = await conn.query(fwdSQL.SELECT_LOT_FIFO_LIST, [
+        line.productCode,
+        line.productCode,
       ]);
 
-      insertedCodes.push(poutbndCode);
+      if (!lotRows || lotRows.length === 0) {
+        throw new Error(
+          `제품(${line.productCode})에 대해 사용 가능한 LOT 재고가 없습니다.`
+        );
+      }
+
+      // LOT들의 남은 수량 합계가 출고수량보다 적으면 에러
+      const totalLotRemain = lotRows.reduce(
+        (sum, r) => sum + Number(r.remainQty || 0),
+        0
+      );
+
+      if (totalLotRemain < qty) {
+        throw new Error(
+          `제품(${line.productCode})의 LOT별 남은 재고가 부족합니다. (출고: ${qty}, LOT재고합계: ${totalLotRemain})`
+        );
+      }
+
+      let remainToShip = qty;
+      let accShipped = shippedQty; // 기존까지 누적 출고 수량
+      const deadline = line.dueDate || outDate;
+
+      // 🔹 4) LOT 순서대로 출고수량을 나눠서 INSERT (선입선출)
+      for (const lot of lotRows) {
+        if (remainToShip <= 0) break;
+
+        const lotRemain = Number(lot.remainQty || 0);
+        if (lotRemain <= 0) continue;
+
+        // 이번 LOT에서 사용할 수량
+        const useQty = Math.min(remainToShip, lotRemain);
+
+        // 이번 lot 적용 후 누적 출고 수량
+        const newShippedTotal = accShipped + useQty;
+
+        // 상태코드는 "이번 출고 이후" 기준
+        let lineStatus = "q2";
+        if (newShippedTotal >= requestedQty) {
+          lineStatus = "q3";
+        } else if (newShippedTotal <= 0) {
+          lineStatus = "q1";
+        }
+
+        // 실출고 코드 자동채번
+        const poutCodeRows = await conn.query(fwdSQL.GENERATE_POUTBND_CODE);
+        const poutbndCode = poutCodeRows[0].poutbnd_code;
+
+        await conn.query(fwdSQL.INSERT_POUTBND, [
+          poutbndCode, // poutbnd_code
+          useQty, // req_qtt
+          useQty, // outbnd_qtt
+          deadline, // deadline
+          lineStatus, // stat (0Q 그룹 코드)
+          releaseCode, // outbound_request_code (out_req_tbl FK)
+          lot.lotNum, // lot_num  🔹 FIFO로 가져온 LOT
+          line.productCode, // prod_code
+          clientCode, // client_code
+          registrant, // mcode
+        ]);
+
+        insertedCodes.push(poutbndCode);
+
+        // 남은 출고해야 할 수량 / 누적 출고 수량 갱신
+        remainToShip -= useQty;
+        accShipped = newShippedTotal;
+      }
     }
 
     await conn.commit();
