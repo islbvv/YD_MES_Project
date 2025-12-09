@@ -15,11 +15,12 @@ SELECT
   note,
   unit,
   result,
-  DATE_FORMAT(start_date, '%y-%m-%d') AS start_date
-FROM v_quality_result
+  DATE_FORMAT(start_date, '%y-%m-%d') AS start_date,
+  source_type
+FROM v_quality_result_all
 WHERE qcr_code LIKE CONCAT('%', IFNULL(?, ''), '%')
-AND prod_code LIKE CONCAT('%', IFNULL(?, ''), '%')
-AND prod_name LIKE CONCAT('%', IFNULL(?, ''), '%')
+AND (prod_code LIKE CONCAT('%', IFNULL(?, ''), '%') OR prod_code IS NULL)
+AND (prod_code LIKE CONCAT('%', IFNULL(?, ''), '%') OR prod_code IS NULL)
 AND check_method LIKE CONCAT('%', IFNULL(?, ''), '%')
 AND result LIKE CONCAT('%', IFNULL(?, ''), '%')
 AND start_date LIKE CONCAT('%', IFNULL(?, ''), '%')

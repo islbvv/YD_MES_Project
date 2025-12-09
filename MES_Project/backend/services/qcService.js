@@ -12,7 +12,9 @@ async function findQcrList(params) {
 
 async function findQcListService(params) {
   try {
-    return await query('QC_SEARCH', params);
+    const result = await query('QC_SEARCH', params);
+    console.log(result);
+    return result;
   } catch (err) {
     throw err;
   }

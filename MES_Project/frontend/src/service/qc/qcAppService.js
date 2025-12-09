@@ -38,6 +38,8 @@ export function useQcAppService() {
         const startDate = kstFormat(store.searchCriteria.startDate);
         const params = [qcrCode, store.searchCriteria.prodCode, store.searchCriteria.prodName, checkMethod, store.searchCriteria.result, startDate];
         const result = await qcService.getQcList(params);
+
+        console.log(result);
         store.qcList = [...result.data];
         return { ok: true };
     }
