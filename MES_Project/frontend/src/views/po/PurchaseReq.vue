@@ -455,14 +455,12 @@ fetchNextCode();
     width: 100%;
 }
 
-/* 캘린더 래퍼: input + 아이콘을 한 줄에 */
 :deep(.po-header-calendar.p-calendar) {
-    display: inline-flex; /* 핵심: 한 줄에 나란히 */
+    display: inline-flex;
     width: 100%;
     align-items: center;
 }
 
-/* 인풋: 나머지 영역 꽉 채우기 */
 :deep(.po-header-calendar .p-inputtext) {
     flex: 1 1 auto;
     height: 40px;
@@ -470,7 +468,6 @@ fetchNextCode();
     box-sizing: border-box;
 }
 
-/* 아이콘 버튼: 오른쪽에 딱 붙이기 */
 :deep(.po-header-calendar .p-datepicker-trigger) {
     flex: 0 0 auto;
     height: 40px;
