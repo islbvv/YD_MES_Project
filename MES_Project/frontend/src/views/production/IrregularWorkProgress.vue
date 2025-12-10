@@ -72,9 +72,16 @@ const callPrdrInsert = async () => {
 
     await axios.post('/api/productionwork/work/prdrinsert', payload);
     work.value.prdrcode = code;
+    // 🔥 추가
+    const updated = { ...work.value, prdrcode: code };
+    workStore.setSelectedWork(updated);
 
-    // ✅ 실적 등록 후 공정 목록 재조회 (prdr_d_code 가져오기)
+    // 공정 재조회
     await refreshProcessList();
+
+    console.log('🟢 [callPrdrInsert] 실적 코드 생성:', code);
+    // ✅ 실적 등록 후 공정 목록 재조회 (prdr_d_code 가져오기)
+
     console.log('🟢 [callPrdrInsert] 실적 코드 생성:', code);
     console.log('🟢 공정 재조회 완료:', details.value);
 };
@@ -202,7 +209,7 @@ const endWork = async () => {
         alert(`작업이 최종 완료되었습니다. 최종 생산량: ${finalQty}개`);
 
         workStore.setWorkRunning(false);
-        router.push('/Production/TaskProgressList');
+        router.push('/Production/WorkPerformance');
     } catch (error) {
         console.error('작업 종료 중 오류:', error);
         alert('작업 종료 처리 중 오류가 발생했습니다. 콘솔 확인하세요.');
