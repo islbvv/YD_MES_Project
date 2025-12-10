@@ -18,7 +18,48 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'select']);
 
+// -----------------------------------------
+// 상태 옵션 (label/value 매핑)
+// -----------------------------------------
+const statusOptions = [
+    { label: '진행중', value: 'v1' },
+    { label: '작업완료', value: 'v2' },
+    { label: '작업보류', value: 'v3' },
+    { label: '작업대기', value: 'v4' }
+];
+
+const getStatusLabel = (v) => {
+    const found = statusOptions.find((s) => s.value === v);
+    return found ? found.label : v || '';
+};
+
+// -----------------------------------------
+// 날짜 포맷 함수
+// -----------------------------------------
+const formatDate = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+};
+
+const formatDateTime = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+};
+
+// -----------------------------------------
 // 검색 & 선택
+// -----------------------------------------
 const searchInput = ref('');
 const selectedPlanNo = ref('');
 
@@ -33,12 +74,26 @@ watch(
     { immediate: true }
 );
 
-// 검색 필터 리스트
+// -----------------------------------------
+// 검색 + 상태 라벨 + 날짜 포맷 적용
+// -----------------------------------------
 const filteredPlanList = computed(() => {
     const s = searchInput.value.toLowerCase();
-    if (!s) return props.planList;
 
-    return props.planList.filter((p) => p.계획번호.toLowerCase().includes(s) || p.상태.toLowerCase().includes(s));
+    return props.planList
+        .filter((p) => p.계획번호 && p.계획번호.trim() !== '')
+        .map((plan) => ({
+            ...plan,
+            상태라벨: getStatusLabel(plan.상태),
+            계획일자포맷: formatDate(plan.계획일자),
+            납기일자포맷: formatDate(plan.납기일자),
+            작업시작일시포맷: formatDateTime(plan.작업시작일시),
+            예상완료일시포맷: formatDateTime(plan.예상완료일시)
+        }))
+        .filter((p) => {
+            if (!s) return true;
+            return p.계획번호.toLowerCase().includes(s) || p.상태라벨.toLowerCase().includes(s);
+        });
 });
 
 // 검색 버튼
@@ -59,14 +114,12 @@ const handleConfirm = () => {
         return;
     }
 
-    // 선택된 3가지
     const selectedData = {
         prdp_code: selectedPlan.계획번호,
         wko_code: selectedPlan.작업지시번호,
         prdp_date: selectedPlan.계획일자
     };
 
-    // 나머지 값들
     const otherData = {
         dueDate: selectedPlan.납기일자,
         planName: selectedPlan.계획명,
@@ -78,7 +131,6 @@ const handleConfirm = () => {
         lineCode: selectedPlan.작업라인코드
     };
 
-    // 부모에게 payload 형태로 전달
     emit('select', { selectedData, otherData });
 };
 
@@ -108,6 +160,8 @@ const handleCancel = () => {
                             <th>계획명</th>
                             <th>계획일자</th>
                             <th>납기일자</th>
+                            <th>작업시작일시</th>
+                            <th>예상완료일시</th>
                             <th>상태</th>
                         </tr>
                     </thead>
@@ -117,16 +171,17 @@ const handleCancel = () => {
                             <td class="select-col">
                                 <input type="checkbox" :checked="plan.계획번호 === selectedPlanNo.value" @click.stop="selectRow(plan)" class="h-4 w-4 text-yellow-500 border-gray-300" />
                             </td>
-
                             <td>{{ plan.계획번호 }}</td>
                             <td>{{ plan.계획명 }}</td>
-                            <td>{{ plan.계획일자 }}</td>
-                            <td>{{ plan.납기일자 }}</td>
-                            <td>{{ plan.상태 }}</td>
+                            <td>{{ plan.계획일자포맷 }}</td>
+                            <td>{{ plan.납기일자포맷 }}</td>
+                            <td>{{ plan.작업시작일시포맷 }}</td>
+                            <td>{{ plan.예상완료일시포맷 }}</td>
+                            <td>{{ plan.상태라벨 }}</td>
                         </tr>
 
                         <tr v-if="filteredPlanList.length === 0">
-                            <td colspan="6" class="text-center py-4 text-gray-500">검색 결과가 없습니다.</td>
+                            <td colspan="8" class="text-center py-4 text-gray-500">검색 결과가 없습니다.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -135,7 +190,6 @@ const handleCancel = () => {
             <!-- 버튼 -->
             <div class="button-footer flex justify-center space-x-3 pt-3 border-t border-gray-200">
                 <button @click="handleCancel" class="btn-footer bg-gray-700 hover:bg-gray-800 text-white">취소</button>
-
                 <button @click="handleConfirm" class="btn-footer bg-yellow-500 hover:bg-yellow-600 text-white">확인</button>
             </div>
         </div>
@@ -198,5 +252,20 @@ const handleCancel = () => {
     border-radius: 4px;
     font-size: 16px;
     font-weight: 600;
+}
+
+.data-table th,
+.data-table td {
+    padding: 8px 12px;
+    text-align: center;
+    border-bottom: 1px solid #f0f0f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.data-table td.plan-name {
+    white-space: normal;
+    word-break: break-word;
 }
 </style>

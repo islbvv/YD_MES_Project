@@ -22,10 +22,10 @@ router.get("/prdrs", async (req, res, next) => {
   }
 });
 
-// 2. GET /api/quality/mpr_ds - mpr_d_tbl목록 전체 조회
-router.get("/mpr_ds", async (req, res, next) => {
+// 2. GET /api/quality/mpo_ds - mpo_d_tbl목록 전체 조회
+router.get("/mpo_ds", async (req, res, next) => {
   try {
-    const orders = await qualityService.getMpr_dList();
+    const orders = await qualityService.getMpo_dList();
     res.json({ code: "Q200", data: orders });
   } catch (err) {
     next(err); // 에러를 전역 오류 처리 미들웨어로 전달
@@ -52,18 +52,60 @@ router.get("/qios", async (req, res, next) => {
   }
 });
 
-// 4. GET /api/quality/qiodetail - qio_tbl단건을 기반으로 품질검사지시 상세 조회
+// 5. GET /api/quality/qiodetail - qio_tbl단건을 기반으로 품질검사지시 상세 조회
 router.get("/qiodetail", async (req, res, next) => {
-  const { qio_code, prdr_code, mpr_d_code } = req.query;
+  const { qio_code, prdr_code, mpo_d_code } = req.query;
   try {
     const orders = await qualityService.getQIODetail(
       qio_code,
       prdr_code,
-      mpr_d_code
+      mpo_d_code
     );
     res.json({ code: "Q200", data: orders });
   } catch (err) {
     next(err); // 에러를 전역 오류 처리 미들웨어로 전달
+  }
+});
+
+router.get("/instruction-orders", async (req, res, next) => {
+  try {
+    const orders = await qualityService.getQualityInstructionsOrderList();
+    res.json({ code: "Q200", data: orders });
+  } catch (err) {
+    next(err); // 에러를 전역 오류 처리 미들웨어로 전달
+  }
+});
+
+// 6. POST /api/quality/qio - 신규 qio_tbl 데이터 추가
+router.post("/qio", async (req, res, next) => {
+  const reqData = req.body;
+  try {
+    const orders = await qualityService.createQuailityInstructionOrder(reqData);
+    res.json({ code: "Q200", data: orders });
+  } catch (err) {
+    next(err); // 에러를 전역 오류 처리 미들웨어로 전달
+  }
+});
+
+// 7. PUT /api/quality/qio - 기존 qio_tbl 데이터 갱신
+router.put("/qio", async (req, res, next) => {
+  const reqData = req.body;
+  try {
+    const orders = await qualityService.updateQuailityInstructionOrder(reqData);
+    res.json({ code: "Q200", data: orders });
+  } catch (err) {
+    next(err); // 에러를 전역 오류 처리 미들웨어로 전달
+  }
+});
+
+// 8. DELETE /api/quality/qio/:qioCode - 기존 qio_tbl 및 관련 qir_tbl 데이터 삭제
+router.delete("/qio/:qioCode", async (req, res, next) => {
+  try {
+    const { qioCode } = req.params;
+    const result = await qualityService.deleteQio(qioCode);
+    res.json({ code: "Q200", data: result });
+  } catch (err) {
+    next(err);
   }
 });
 

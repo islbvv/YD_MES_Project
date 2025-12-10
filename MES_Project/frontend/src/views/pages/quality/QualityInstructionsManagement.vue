@@ -2,8 +2,12 @@
 import { onMounted, ref, computed } from 'vue';
 import SearchModal from './SearchModal.vue'; // SearchModal 컴포넌트 임포트
 import { useQualityStore } from '@/stores/qualityStore';
+import { useToast } from 'primevue/usetoast';
+import { useConfirm } from 'primevue/useconfirm';
 
 const qualityStore = useQualityStore();
+const toast = useToast();
+const confirm = useConfirm();
 
 // 1. tableData를 스토어의 qcrList를 바라보는 computed 속성으로 변경합니다.
 const tableData = computed(() => qualityStore.qcrList); // 검사항목 테이블 데이터
@@ -13,6 +17,7 @@ const employeeManagerList = computed(() => qualityStore.getEmployeeManagers); //
 const formState = ref({
     qio_code: '', // 검사지시코드
     insp_date: '', // 지시일자
+    emp_code: '', // 지시자 코드
     emp_name: '', // 지시자
     target_type: '', // 검사대상 (자재/제품)
     item_code: '', // 품목코드
@@ -48,13 +53,13 @@ const openModal = async (type) => {
         // TODO: dataKey prop 추가 필요
     } else if (type === 'stock') {
         modalTitle.value = '자재목록 불러오기';
-        // 스토어에 mpr_dList 데이터가 없으면 가져옵니다.
-        if (!qualityStore.mpr_dList.length) {
-            await qualityStore.fetchMpr_dList();
+        // 스토어에 mpo_dList 데이터가 없으면 가져옵니다.
+        if (!qualityStore.mpo_dList.length) {
+            await qualityStore.fetchMpo_dList();
         }
-        modalData.value = qualityStore.mpr_dList;
+        modalData.value = qualityStore.mpo_dList;
         modalColumns.value = [
-            { field: 'mpr_d_code', header: '자재 코드' },
+            { field: 'mpo_d_code', header: '발주서 코드' },
             { field: 'mat_name', header: '자재 명' },
             { field: 'req_qtt', header: '발주수량' }
         ];
@@ -67,7 +72,7 @@ const openModal = async (type) => {
         }
         modalData.value = qualityStore.prdrList;
         modalColumns.value = [
-            { field: 'prdr_code', header: '제품 코드' },
+            { field: 'prdr_code', header: '생산실적 코드' },
             { field: 'prod_name', header: '제품 명' },
             { field: 'production_qtt', header: '수량' }
         ];
@@ -83,15 +88,16 @@ const handleModalConfirm = async (selectedItem) => {
         formState.value.qio_code = selectedItem.qio_code;
         formState.value.insp_date = selectedItem.insp_date;
         formState.value.emp_name = selectedItem.emp_name;
+        formState.value.emp_code = selectedItem.emp_code; // 올바른 emp_code를 할당하도록 수정
         isInstructorReadOnly.value = true; // 지시자 필드를 읽기 전용으로 설정
 
-        const { qio_code, prdr_code, mpr_d_code } = selectedItem;
-        await qualityStore.loadInspectionDetails({ qio_code, prdr_code, mpr_d_code });
+        const { qio_code, prdr_code, mpo_d_code } = selectedItem;
+        await qualityStore.loadInspectionDetails({ qio_code, prdr_code, mpo_d_code });
 
-        if ((selectedItem.prdr_code != null && selectedItem.mpr_d_code == null) || (selectedItem.prdr_code == null && selectedItem.mpr_d_code != null)) {
-            if (selectedItem.mpr_d_code != null) {
-                formState.value.target_type = '자재';
-                formState.value.item_code = qualityStore.selectedQIO[0][0].mpr_d_code;
+        if ((selectedItem.prdr_code != null && selectedItem.mpo_d_code == null) || (selectedItem.prdr_code == null && selectedItem.mpo_d_code != null)) {
+            if (selectedItem.mpo_d_code != null) {
+                formState.value.target_type = qualityStore.selectedQIO[0][0].note; //'원자재 || 부자재';
+                formState.value.item_code = qualityStore.selectedQIO[0][0].mpo_d_code;
                 formState.value.item_name = qualityStore.selectedQIO[0][0].mat_name;
                 formState.value.item_quantity = qualityStore.selectedQIO[0][0].req_qtt;
             } else if (selectedItem.prdr_code != null) {
@@ -101,10 +107,10 @@ const handleModalConfirm = async (selectedItem) => {
                 formState.value.item_quantity = qualityStore.selectedQIO[0][0].production_qtt;
             }
         }
-
         selectedProducts.value = [];
         qualityStore.selectedQIO[1].forEach((item) => {
             selectedProducts.value.push({
+                qcr_code: item.qcr_code,
                 inspection_item: item.inspection_item,
                 range_top: item.range_top,
                 range_bot: item.range_bot,
@@ -112,8 +118,8 @@ const handleModalConfirm = async (selectedItem) => {
             });
         });
     } else if (modalType.value === 'stock') {
-        formState.value.target_type = '자재';
-        formState.value.item_code = selectedItem.mpr_d_code;
+        formState.value.target_type = selectedItem.note; // '자재';
+        formState.value.item_code = selectedItem.mpo_d_code;
         formState.value.item_name = selectedItem.mat_name;
         formState.value.item_quantity = selectedItem.req_qtt;
     } else if (modalType.value === 'production') {
@@ -125,10 +131,11 @@ const handleModalConfirm = async (selectedItem) => {
 };
 
 // 화면 상태를 초기화하는 함수
-const resetForm = () => {
+const resetForm = async () => {
     formState.value = {
         qio_code: '',
         insp_date: formatDate(new Date()), // 지시일자는 오늘 날짜로 설정
+        emp_code: '',
         emp_name: '',
         target_type: '',
         item_code: '',
@@ -139,6 +146,9 @@ const resetForm = () => {
     isInstructorReadOnly.value = false;
     // 데이터 테이블에서 선택된 항목들 초기화
     selectedProducts.value = null;
+
+    await qualityStore.fetchMpo_dList();
+    await qualityStore.fetchPrdrList(); 
 };
 
 // 선택된 행들을 저장할 반응형 변수
@@ -195,8 +205,89 @@ onMounted(() => {
     formState.value.insp_date = formatDate(new Date()); // 지시일자를 오늘 날짜로 설정
 });
 
-const seveQualityInspectionOrder = () => {
-    console.log('hello');
+const seveQualityInspectionOrder = async () => {
+    // 1. 유효성 검사
+    if (!selectedProducts.value || selectedProducts.value.length === 0) {
+        toast.add({ severity: 'warn', summary: '경고', detail: '검사항목을 선택해주세요.', life: 3000 });
+        return;
+    }
+
+    if (!formState.value.emp_code && !isInstructorReadOnly.value) {
+        toast.add({ severity: 'warn', summary: '경고', detail: '지시자를 선택해주세요.', life: 3000 });
+        return;
+    }
+
+    if (!formState.value.target_type || !formState.value.item_code) {
+        toast.add({ severity: 'warn', summary: '경고', detail: '검사대상을 선택해주세요.', life: 3000 });
+        return;
+    }
+
+    // 저장할 데이터 공통 구성
+    const saveData = {
+        insp_date: formState.value.insp_date,
+        emp_code: formState.value.emp_code,
+        insp_vol: formState.value.item_quantity,
+        prdr_code: formState.value.target_type === '제품' ? formState.value.item_code : null,
+        mpo_d_code: formState.value.target_type !== '제품' ? formState.value.item_code : null,
+        qcr_codes: selectedProducts.value.map((item) => item.qcr_code)
+    };
+
+    // [DEBUG] 백엔드로 전송될 데이터 확인
+    console.log('백엔드로 전송될 데이터:', saveData);
+
+    try {
+        if (!formState.value.qio_code) {
+            // 생성 로직
+            const newQioCode = await qualityStore.saveQIO(saveData);
+            formState.value.qio_code = newQioCode;
+            toast.add({ severity: 'success', summary: '성공', detail: '성공적으로 저장되었습니다.', life: 3000 });
+            resetForm(); // 생성 후 폼 초기화
+            await qualityStore.fetchQIOList(); // 생성 후 목록 새로고침
+        } else {
+            // 수정 로직
+            saveData.qio_code = formState.value.qio_code;
+            await qualityStore.saveQIO(saveData);
+            toast.add({ severity: 'success', summary: '성공', detail: '성공적으로 수정되었습니다.', life: 3000 });
+            resetForm(); // 수정 성공 후 폼 초기화
+
+            // 수정하고 수정사항 반영해서 목록 갱신
+            await qualityStore.fetchMpo_dList();
+            await qualityStore.fetchPrdrList();
+            await qualityStore.fetchQIOList(); // 수정 후 목록 새로고침
+        }
+    } catch (error) {
+        console.error('저장/수정 중 오류 발생:', error);
+        toast.add({ severity: 'error', summary: '오류', detail: '작업 중 오류가 발생했습니다.', life: 3000 });
+    }
+};
+
+const onDelete = async () => {
+    if (!formState.value.qio_code) {
+        toast.add({ severity: 'warn', summary: '경고', detail: '삭제할 검사지시를 선택해주세요.', life: 3000 });
+        return;
+    }
+
+    confirm.require({
+        group: 'qimDialog',
+        message: '정말로 삭제하시겠습니까?',
+        header: '삭제 확인',
+        icon: 'pi pi-exclamation-triangle',
+        acceptClass: 'p-button-success',
+        rejectClass: 'p-button-danger',
+        accept: async () => {
+            try {
+                await qualityStore.deleteQIO(formState.value.qio_code);
+                toast.add({ severity: 'success', summary: '성공', detail: '성공적으로 삭제되었습니다.', life: 3000 });
+                resetForm();
+            } catch (error) {
+                console.error('삭제 중 오류 발생:', error);
+                toast.add({ severity: 'error', summary: '오류', detail: '삭제 중 오류가 발생했습니다.', life: 3000 });
+            }
+        },
+        reject: () => {
+            toast.add({ severity: 'info', summary: '정보', detail: '삭제가 취소되었습니다.', life: 3000 });
+        }
+    });
 };
 </script>
 
@@ -206,9 +297,9 @@ const seveQualityInspectionOrder = () => {
         <div class="flex justify-between items-center">
             <div class="font-semibold text-xl">기본정보</div>
             <div class="flex gap-2">
-                <Button label="삭제"></Button>
-                <Button label="초기화" @click="resetForm"></Button>
-                <Button label="저장" @click="seveQualityInspectionOrder"></Button>
+                <Button label="삭제" severity="danger" @click="onDelete"></Button>
+                <Button label="초기화" severity="secondary" @click="resetForm"></Button>
+                <Button label="저장" severity="success" @click="seveQualityInspectionOrder"></Button>
                 <Button label="검사지시 불러오기" @click="openModal('inspection')"></Button>
             </div>
         </div>
@@ -228,7 +319,10 @@ const seveQualityInspectionOrder = () => {
             <div class="grid grid-cols-12 gap-2">
                 <label class="font-semibold flex items-center justify-center col-span-12 md:col-span-4">지시자</label>
                 <div class="col-span-12 md:col-span-8">
-                    <Dropdown v-model="formState.emp_name" :options="employeeManagerList" optionLabel="emp_name" optionValue="emp_name" placeholder="지시자 선택" class="w-full" :disabled="isInstructorReadOnly" />
+                    <!-- '검사지시 불러오기'로 emp_name만 있을 경우 InputText로 표시 -->
+                    <InputText v-if="isInstructorReadOnly" v-model="formState.emp_name" class="w-full" :readonly="true" />
+                    <!-- 직접 선택할 경우 Dropdown으로 emp_code를 모델에 바인딩 -->
+                    <Dropdown v-else v-model="formState.emp_code" :options="employeeManagerList" optionLabel="emp_name" optionValue="emp_code" placeholder="지시자 선택" class="w-full" />
                 </div>
             </div>
         </div>
@@ -307,6 +401,9 @@ const seveQualityInspectionOrder = () => {
 
         <!-- SearchModal 컴포넌트 추가 -->
         <SearchModal v-model:visible="isModalVisible" :header="modalTitle" :data="modalData" :columns="modalColumns" @onConfirm="handleModalConfirm" />
+
+        <Toast />
+        <ConfirmDialog group="qimDialog"></ConfirmDialog>
     </div>
 </template>
 

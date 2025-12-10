@@ -1,44 +1,67 @@
+// stores/workStore.js
 import { defineStore } from 'pinia';
 
 export const useWorkStore = defineStore('workStore', {
     state: () => ({
-        selectedWork: null, // TaskProgressList에서 선택한 row
-        irregularData: null // IrregularWork에서 사용할 데이터
+        selectedWork: null,
+        irregularData: null,
+        isWorkRunning: false,
+        currentProcessIndex: 0,
+        processRates: {} // { prdr_d_code: 진행률 }
     }),
 
     actions: {
-        // 작업지시 선택 저장
         setSelectedWork(work) {
             this.selectedWork = work;
-            localStorage.setItem('selectedWork', JSON.stringify(work));
+            sessionStorage.setItem('selectedWork', JSON.stringify(work));
         },
-
-        // 새로고침 시 복원
         restoreSelectedWork() {
-            const saved = localStorage.getItem('selectedWork');
-            if (saved) {
-                this.selectedWork = JSON.parse(saved);
-            }
+            const saved = sessionStorage.getItem('selectedWork');
+            if (saved) this.selectedWork = JSON.parse(saved);
         },
 
-        // 비정형 작업용 데이터 저장 (Productionwork에서 IrregularWork로 이동할 때 사용)
-        // data: { work, details }
         setIrregularData(data) {
             this.irregularData = data;
-            localStorage.setItem('irregularData', JSON.stringify(data));
+            sessionStorage.setItem('irregularData', JSON.stringify(data));
         },
-
-        // 비정형 작업용 데이터 복원
         restoreIrregularData() {
-            const saved = localStorage.getItem('irregularData');
-            if (saved) {
-                this.irregularData = JSON.parse(saved);
-            }
+            const saved = sessionStorage.getItem('irregularData');
+            if (saved) this.irregularData = JSON.parse(saved);
         },
 
-        resetIrregularData() {
-            this.irregularData = null;
-            localStorage.removeItem('irregularData');
+        // 작업 진행 여부
+        setWorkRunning(val) {
+            this.isWorkRunning = val;
+            sessionStorage.setItem('isWorkRunning', val);
+        },
+        restoreWorkRunning() {
+            const saved = sessionStorage.getItem('isWorkRunning');
+            if (saved !== null) this.isWorkRunning = saved === 'true';
+        },
+
+        // 현재 공정 인덱스 저장
+        setCurrentProcessIndex(idx) {
+            this.currentProcessIndex = idx;
+            sessionStorage.setItem('currentProcessIndex', idx);
+        },
+        restoreCurrentProcessIndex() {
+            const saved = sessionStorage.getItem('currentProcessIndex');
+            if (saved !== null) this.currentProcessIndex = Number(saved);
+        },
+
+        // 개별 공정 진행률 저장
+        updateProcessRate(code, rate) {
+            this.processRates[code] = rate;
+            sessionStorage.setItem('processRates', JSON.stringify(this.processRates));
+        },
+        restoreProcessRates() {
+            const saved = sessionStorage.getItem('processRates');
+            if (saved) this.processRates = JSON.parse(saved);
+        },
+
+        resetProcessRates() {
+            this.processRates = {};
+            sessionStorage.removeItem('processRates');
         }
     }
 });

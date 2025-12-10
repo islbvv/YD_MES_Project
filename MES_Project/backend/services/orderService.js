@@ -401,3 +401,73 @@ exports.saveOrder = async (payload) => {
     conn.release();
   }
 };
+
+// 주문 단건 조회
+exports.getOrder = async (ordCode) => {
+  try {
+    const rows = await query("selectOrder", ordCode);
+    if (!rows || !rows.length) return [];
+
+    for (const order of rows) {
+      // 규격 공통 코드 0O인데 왜 0X에 16 추가되어 있는걸까...
+      // 일단 x1일 경우에 예외처리함
+      order.com_value_name = await commonService.getNote("0J", order.com_value);
+      if (order.spec.startsWith("x")) {
+        order.spec_name = await commonService.getNote("0X", order.spec);
+      } else if (order.spec.startsWith("z")) {
+        order.spec_name = await commonService.getNote("0Z", order.spec);
+      } else {
+        order.spec_name = await commonService.getNote("0O", order.spec);
+      }
+      order.unit_name = await commonService.getNote("0H", order.unit);
+    }
+
+    return rows;
+  } catch (err) {
+    console.error("[orderService.js || 주문 단건 조회 실패]", err.message);
+    throw err;
+  }
+};
+
+// 신규 주문번호, 주문상세번호 생성
+exports.addCode = async () => {
+  try {
+    // 신규 주문번호 생성
+    const currentYear = new Date().getFullYear().toString(); // 현재 연도(YYYY)
+    const codeLength = 4; // 주문번호 끝자리 숫자 길이
+
+    // DB에서 기존 주문번호 중 최대값 조회
+    const oRows = await query("selectMaxOrderCode");
+    const oMaxCode = oRows[0]?.max_ord_code || null; // 최대 주문번호 없으면 null
+
+    // 신규 주문번호 끝자리 숫자 계산
+    let oNextNum = 1; // 기본값: 1
+    if (oMaxCode) oNextNum = parseInt(oMaxCode.slice(-codeLength)) + 1; // 기존 최대값 +1
+
+    // 신규 주문번호 포맷: ORD-YYYY0001
+    new_ord_code = `ORD-${currentYear}${String(oNextNum).padStart(
+      codeLength,
+      "0"
+    )}`;
+
+    // 신규 주문상세번호 생성
+    const dRows = await query("selectMaxOrderDetailCode");
+    const dMaxCode = dRows[0]?.max_ord_d_code || null; // 최대 주문상세번호 없으면 null
+
+    // 신규 주문상세번호 끝자리 숫자 계산
+    let dNextNum = 1; // 기본값: 1
+    if (dMaxCode) dNextNum = parseInt(dMaxCode.slice(-4)) + 1; // 기존 최대값 +1
+
+    // 신규 주문상세번호 포맷: ORD-D-0001
+    new_ord_d_code = `ORD-D-${String(dNextNum).padStart(4, "0")}`;
+
+    return { new_ord_code, new_ord_d_code };
+  } catch (err) {
+    await conn.rollback();
+    console.error(
+      "[orderService.js || 신규 주문번호, 주문상세번호 생성 실패]",
+      err
+    );
+    throw err;
+  }
+};
