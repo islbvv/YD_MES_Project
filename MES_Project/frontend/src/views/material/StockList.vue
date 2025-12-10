@@ -123,10 +123,10 @@ onMounted(() => {
                 </div>
 
                 <div class="filter-row mb-4">
-                    <InputText v-model="filters.keyword" placeholder="자재명, 자재코드" class="w-60 mr-4" @keydown.enter="search" />
-                    <Dropdown v-model="filters.type" :options="typeOptions" optionLabel="label" optionValue="value" placeholder="분류" class="w-32 mr-4" />
-                    <Dropdown v-model="filters.status" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="상태" class="w-32 mr-4" />
-                    <Button label="검색" @click="search" class="mr-4" />
+                    <InputText v-model="filters.keyword" placeholder="자재명, 자재코드" class="filter-input mr-3" @keydown.enter="search" />
+                    <Dropdown v-model="filters.type" :options="typeOptions" optionLabel="label" optionValue="value" placeholder="분류" class="filter-dropdown mr-3" />
+                    <Dropdown v-model="filters.status" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="상태" class="filter-dropdown mr-3" />
+                    <Button label="검색" @click="search" class="filter-button" />
                 </div>
 
                 <div class="card-header mt-2">

@@ -46,15 +46,20 @@ const registerInboundItems = async (items) => {
     );
     let lotSeq = generateSeq(lastLotRows[0] ? lastLotRows[0].lot_num : null);
     let qioSeq = generateSeq(lastQioRows[0] ? lastQioRows[0].qio_code : null);
-    
+
     // Create ONE new QIO for the whole batch
     const newQioCode = `QIO-${todayStr}-${String(qioSeq).padStart(3, "0")}`;
     const representativeManager = items.length > 0 ? items[0].manager : null;
     if (!representativeManager) {
-      throw new Error('Manager/Employee code is required for at least one item.');
+      throw new Error(
+        "Manager/Employee code is required for at least one item."
+      );
     }
-    await conn.query(sqlList.insertQio, [newQioCode, new Date(), representativeManager]);
-
+    await conn.query(sqlList.insertQio, [
+      newQioCode,
+      new Date(),
+      representativeManager,
+    ]);
 
     const lotDataList = [];
     const inboundDataList = [];
@@ -69,7 +74,7 @@ const registerInboundItems = async (items) => {
       const nowDateTime = getNowDateTimeStr();
 
       lotDataList.push([newLotNum, nowDateTime, "i4", item.matCode]);
-      
+
       inboundDataList.push([
         newMinbndCode,
         item.matCode,
