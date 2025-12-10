@@ -268,27 +268,15 @@ exports.saveOrder = async (payload) => {
 
     ord_stat = ord_stat || "a1";
 
-    let new_ord_code = ord_code;
-
     // ------------------------------
     // 2. 주문 등록 OR 수정
     // ------------------------------
-    if (!new_ord_code) {
-      // 신규 주문번호 생성
-      const currentYear = new Date().getFullYear().toString();
-      const codeLength = 4;
+    let new_ord_code = ord_code;
 
-      const oRows = await query("selectMaxOrderCode");
-      const oMaxCode = oRows[0]?.max_ord_code || null;
+    // DB에 해당 ord_code가 존재하는지 확인
+    const existingOrderRows = await query("selectOrder", [new_ord_code]);
 
-      let nextNum = 1;
-      if (oMaxCode) nextNum = parseInt(oMaxCode.slice(-codeLength)) + 1;
-
-      new_ord_code = `ORD-${currentYear}${String(nextNum).padStart(
-        codeLength,
-        "0"
-      )}`;
-
+    if (!existingOrderRows.length) {
       // 주문 INSERT
       await query("insertOrder", [
         new_ord_code,
@@ -310,6 +298,23 @@ exports.saveOrder = async (payload) => {
         client_code,
         new_ord_code,
       ]);
+    }
+
+    if (!new_ord_code) {
+      // 신규 주문번호 생성
+      const currentYear = new Date().getFullYear().toString();
+      const codeLength = 4;
+
+      const oRows = await query("selectMaxOrderCode");
+      const oMaxCode = oRows[0]?.max_ord_code || null;
+
+      let nextNum = 1;
+      if (oMaxCode) nextNum = parseInt(oMaxCode.slice(-codeLength)) + 1;
+
+      new_ord_code = `ORD-${currentYear}${String(nextNum).padStart(
+        codeLength,
+        "0"
+      )}`;
     }
 
     // ------------------------------
